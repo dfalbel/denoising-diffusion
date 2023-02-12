@@ -1,4 +1,4 @@
-box::use(./unet[unet])
+box::use(./unet[unet, swish])
 box::use(torch[...])
 
 diffusion_schedule <- nn_module(
@@ -30,16 +30,16 @@ normalize <- nn_module(
       self$update_stats(x)
     }
 
-    (x - self$means)/ self$stds
+    (x - self$means) / self$stds
   },
   update_stats = function(x) {
     means <- torch_mean(x, dim = c(1,3,4), keepdim = TRUE)
-    stds <- torch_std(x, dim = c(1,3,4), keepdim = TRUE)
+    vars <- torch_var(x, dim = c(1,3,4), keepdim = TRUE)
 
     w <- 1 / self$step
 
     self$means$mul_(1-w)$add_(w*means)
-    self$stds$mul_(1-w)$add_(w*stds)
+    self$stds$pow_(2)$mul_(1-w)$add_(w*vars)$sqrt_()
   },
   denormalize = function(x) {
     x * self$stds + self$means
@@ -56,9 +56,10 @@ sinusoidal_embedding <- nn_module(
     self$angular_speeds <- nn_buffer(2*pi*self$frequencies)
   },
   forward = function(x) {
+    embeddings <- self$angular_speeds*x
     out <- torch_cat(dim = 4, list(
-      torch_sin(self$angular_speeds*x),
-      torch_cos(self$angular_speeds*x)
+      torch_sin(embeddings),
+      torch_cos(embeddings)
     ))
     torch_transpose(out, 4, 2)
   }
@@ -70,32 +71,38 @@ diffusion <- nn_module(
     self$embedding <- sinusoidal_embedding(embedding_dim = embedding_dim)
 
     self$conv <- nn_conv2d(image_size[1], embedding_dim, kernel_size = 1)
-    self$conv_embed <- nn_conv2d(embedding_dim, embedding_dim, kernel_size = 1)
+    self$emb_conv <- nn_conv2d(embedding_dim, embedding_dim, kernel_size = 1)
 
     self$upsample <- nn_upsample(size = image_size[2:3])
+
+    self$activation <- swish()
     self$conv_out <- nn_conv2d(embedding_dim, image_size[1], kernel_size = 1)
     purrr::walk(self$conv_out$parameters, nn_init_zeros_)
   },
   forward = function(noisy_images, noise_variances) {
     embedded_variance <- noise_variances |>
       self$embedding() |>
-      self$upsample() |>
-      self$conv_embed()
+      self$emb_conv() |>
+      self$activation() |>
+      self$upsample()
 
     embedded_image <- noisy_images |>
-      self$conv()
+      self$conv() |>
+      self$activation()
 
     unet_input <- torch_cat(list(embedded_variance, embedded_image), dim = 2)
     unet_input |>
       self$unet() |>
+      self$activation() |>
       self$conv_out()
   }
 )
 
 diffusion_model <- nn_module(
-  initialize = function(image_size, embedding_dim = 32, widths = c(32, 64, 96, 128), block_depth = 2) {
+  initialize = function(image_size, embedding_dim = 32, widths = c(32, 64, 96, 128), block_depth = 2,
+                        signal_rate = c(0.02, 0.95)) {
     self$diffusion <- diffusion(image_size, embedding_dim, widths, block_depth)
-    self$diffusion_schedule <- diffusion_schedule()
+    self$diffusion_schedule <- diffusion_schedule(signal_rate[1], signal_rate[2])
     self$image_size <- image_size
     self$normalize <- normalize(image_size[1])
   },
@@ -130,7 +137,7 @@ diffusion_model <- nn_module(
     )
   },
   loss = function(inputs, targets) {
-    nnf_mse_loss(inputs$noises, inputs$pred_noises)
+    nnf_l1_loss(inputs$noises, inputs$pred_noises)
   },
   generate = function(num_images, diffusion_steps = 20) {
     device <- self$parameters[[1]]$device
@@ -142,7 +149,7 @@ diffusion_model <- nn_module(
     for (step in seq_len(diffusion_steps)) {
       noisy_images <- next_noisy_images
 
-      diffusion_times = torch_ones(c(num_images, 1, 1, 1), device = device) - (step-1) * step_size
+      diffusion_times <- torch_ones(c(num_images, 1, 1, 1), device = device) - (step-1) * step_size
       res <- self$forward(noisy_images, diffusion_times)
 
       # remix the predicted components using the next signal and noise rates
@@ -152,7 +159,7 @@ diffusion_model <- nn_module(
       next_noisy_images <- rates$signal * res$pred_images + rates$noise * res$pred_noises
     }
 
-    self$normalize$denormalize(next_noisy_images)
+    self$normalize$denormalize(res$pred_images)
   }
 )
 

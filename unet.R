@@ -30,7 +30,7 @@ resnet_block <- nn_module(
       kernel_size = 1,
       padding = "same"
     )
-    self$batch_norm <- nn_batch_norm2d(num_features = in_channels)
+    self$batch_norm <- nn_batch_norm2d(num_features = in_channels, affine = FALSE)
     self$conv1 <- nn_conv2d(
       in_channels,
       out_channels,
@@ -59,35 +59,46 @@ resnet_block <- nn_module(
 down_block <- nn_module(
   initialize = function(in_channels, out_channels, block_depth = 2) {
 
-    self$resnet <- nn_sequential(
+    self$resnet_blocks <- nn_module_list(rlang::list2(
       resnet_block(in_channels, out_channels),
       !!! map(seq_len(block_depth - 1), \(i) resnet_block(out_channels, out_channels))
-    )
+    ))
 
-    self$downsample <- downsample(out_channels, out_channels)
+    self$downsample <- nn_avg_pool2d(kernel_size = c(2,2))
   },
-  forward = function(input) {
-    input |>
-      self$resnet() |>
-      self$downsample()
+  forward = function(x) {
+    skips <- list(x)
+    for (block in seq_along(self$resnet_blocks)) {
+      skips[[block+1]] <- self$resnet_blocks[[block]](skips[[block]])
+    }
+
+    output <- self$downsample(skips[[length(skips)]])
+    list(
+      output = output,
+      skips = skips[-1]
+    )
   }
 )
 
 up_block <- nn_module(
   initialize = function(in_channels, out_channels, block_depth = 2) {
-    self$upsample <- nn_upsample(scale_factor = 2)
-    self$conv <- nn_conv2d(in_channels, out_channels, kernel_size = 1)
-    self$resnet <- resnet_block(2*out_channels, out_channels)
+    self$upsample <- nn_upsample(scale_factor = 2, mode = "bilinear")
 
-    self$resnet <- nn_sequential(
-      resnet_block(2*out_channels, out_channels),
-      !!! map(seq_len(block_depth - 1), \(i) resnet_block(out_channels, out_channels))
-    )
+    self$resnet_blocks <- nn_module_list(rlang::list2(
+      !!! map(seq_len(block_depth), \(i) resnet_block(2*in_channels, in_channels))
+    ))
+
+    self$conv_out <- nn_conv2d(in_channels, out_channels, kernel_size=3, padding="same")
   },
-  forward = function(x, skip) {
-    x <- x |> self$upsample() |> self$conv()
-    x <- torch_cat(list(x, skip), dim = 2)
-    self$resnet(x)
+  forward = function(x, skips) {
+    x <- x |> self$upsample()
+
+    for (block in seq_len(length(self$resnet_blocks))) {
+      x <- torch_cat(list(x, skips[[block]]), dim = 2)
+      x <- self$resnet_blocks[[block]](x)
+    }
+
+    self$conv_out(x)
   }
 )
 
@@ -108,21 +119,25 @@ unet <- nn_module(
       )
     }
 
+    self$activation <- swish()
     self$conv <- nn_conv2d(in_channels, out_channels, kernel_size = 1)
   },
   forward = function(x) {
 
-    skips <- list(x)
+    skips <- list(list(output = x))
     for (i in seq_along(self$down_blocks)) {
-      skips[[i+1]] <- self$down_blocks[[i]](skips[[i]])
+      skips[[i+1]] <- self$down_blocks[[i]](skips[[i]]$output)
     }
 
     skips <- rev(skips)
+    output <- skips[[1]]$output
     for (i in seq_along(self$up_blocks)) {
-      skips[[i+1]] <- self$up_blocks[[i]](skips[[i]], skips[[i+1]])
+      output <- self$up_blocks[[i]](output, rev(skips[[i]]$skips))
     }
 
-    self$conv(skips[[i+1]])
+    output |>
+      self$activation() |>
+      self$conv()
   }
 )
 

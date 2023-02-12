@@ -4,37 +4,54 @@
 #| sourcecode:
 #|  - "*.R"
 #| output-scalars:
+#|   - step: '\[(\step)]'
 #|   - '(\key): (\value)'
 
 box::use(luz[...])
 box::use(./diffusion[diffusion_model])
-box::use(./dataset[train_ds])
+box::use(./dataset[train_ds, debug_ds])
 box::use(torch[...])
 
 block_depth <- 2
-lr <- 1e-4
-optimizer <- "adam"
-batch_size <- 128
-epochs <- 200
+lr <- 1e-3
+optimizer <- "adamw"
+batch_size <- 64
+epochs <- 1000
+min_signal_rate <- 0.02
+max_signal_rate <- 0.95
+patience <- 100
+weight_decay <- 1e-4
 
-image_size <- c(3 , 64, 64)
+image_size <- c(3 , 32, 32)
 
 optimizer <- if (optimizer == "adam") {
   optim_adam
+} else if (optimizer == "adamw") {
+  torchopt::optim_adamw
 } else {
   rlang::abort("Optimizer not currently supported.")
 }
 
+dataset <- train_ds
+
 model <- diffusion_model %>%
   setup(optimizer = optimizer) %>%
-  set_hparams(image_size = image_size, block_depth = block_depth) %>%
-  set_opt_hparams(lr = lr)
+  set_hparams(
+    image_size = image_size,
+    block_depth = block_depth,
+    signal_rate = c(min_signal_rate, max_signal_rate)
+  ) %>%
+  set_opt_hparams(lr = lr, weight_decay = weight_decay)
+
+finder <- luz::lr_finder(model, data = dataset)
+plot(finder) + ggplot2::coord_cartesian(ylim = c(0, 2))
 
 fitted <- model %>%
   fit(
-    train_ds, epochs = epochs, dataloader_options = list(batch_size = batch_size), verbose = TRUE,
+    dataset, epochs = epochs, dataloader_options = list(batch_size = batch_size), verbose = TRUE,
     callbacks = list(
-      luz_callback_lr_scheduler(lr_step, step_size = 50, gamma = 0.1)
+      luz_callback_lr_scheduler(lr_step, step_size = patience, gamma = 0.1^(1/3)),
+      luz_callback_early_stopping(monitor = "train_loss", min_delta = 0.0005, patience = patience)
     )
   )
 

@@ -39,7 +39,7 @@ train_ds <- pet_dataset(
   dir,
   download = TRUE,
   split = "train",
-  size = c(64, 64)
+  size = c(32, 32)
 )
 
 valid_ds <- pet_dataset(
@@ -48,3 +48,22 @@ valid_ds <- pet_dataset(
   split = "valid",
   size = c(64, 64)
 )
+
+debug_dataset <- dataset(
+  inherit = pet_dataset,
+  initialize = function(...) {
+    super$initialize(...)
+  },
+  .getitem = function(i) {
+    super$.getitem((i-1) %% 64 + 1)
+  }
+)
+
+debug_ds <- debug_dataset(
+  dir,
+  download = TRUE,
+  split = "train",
+  size = c(32, 32)
+)
+
+debug_ds[64]
