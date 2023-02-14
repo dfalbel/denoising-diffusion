@@ -2,68 +2,60 @@ box::use(torch[...])
 box::use(torchvision[...])
 box::use(torchdatasets[...])
 
-dir <- "~/Documents/posit/denoising-diffusion/pets" #caching directory
+dir <- "./data" #caching directory
 
-# A light wrapper around the `oxford_pet_dataset` that resizes and transforms
-# input images and masks to the specified `size` and introduces the `augmentation`
-# argument, allowing us to specify transformations that must be synced between
-# images and masks, eg. flipping, cropping, etc.
-pet_dataset <- torch::dataset(
-  inherit = oxford_pet_dataset,
-  initialize = function(..., augmentation = NULL, size = c(224, 224)) {
-
-    input_transform <- function(x) {
-      x %>%
-        transform_to_tensor() %>%
-        transform_resize(size)
+diffusion_dataset <- dataset(
+  "DiffusionDataset",
+  initialize = function(dataset, image_size, ...) {
+    self$transform <- function(x) {
+      x |>
+        transform_to_tensor() |>
+        transform_resize(image_size)
     }
 
-    super$initialize(
-      ...,
-      transform = input_transform
+    self$data <- dataset(
+      dir,
+      transform = self$transform,
+      ...
     )
-
-    if (is.null(augmentation))
-      self$augmentation <- function(...) {list(...)}
-    else
-      self$augmentation <- augmentation
-
   },
   .getitem = function(i) {
-    items <- super$.getitem(i)
-    list(items[[1]], 1)
+    self$data[i]
+  },
+  .length = function() {
+    length(self$data)
   }
-)
-
-train_ds <- pet_dataset(
-  dir,
-  download = TRUE,
-  split = "train",
-  size = c(32, 32)
-)
-
-valid_ds <- pet_dataset(
-  dir,
-  download = TRUE,
-  split = "valid",
-  size = c(64, 64)
 )
 
 debug_dataset <- dataset(
-  inherit = pet_dataset,
-  initialize = function(...) {
-    super$initialize(...)
+  initialize = function(dataset) {
+    self$dataset <- dataset
   },
   .getitem = function(i) {
-    super$.getitem((i-1) %% 64 + 1)
+    self$dataset$.getitem((i-1) %% 64 + 1)
+  },
+  .length = function() {
+    length(self$dataset)
   }
 )
 
-debug_ds <- debug_dataset(
-  dir,
-  download = TRUE,
-  split = "train",
-  size = c(32, 32)
-)
-
-debug_ds[64]
+make_dataset <- function(type = c("pets", "flowers"), image_size) {
+  type <- rlang::arg_match(type)
+  if (type == "pets") {
+    diffusion_dataset(
+      torchdatasets::oxford_pet_dataset,
+      image_size,
+      split = "train",
+      download = TRUE
+    )
+  } else if (type == "flowers") {
+    diffusion_dataset(
+      torchdatasets::oxford_flowers102_dataset,
+      image_size,
+      split = c("train", "test"),
+      download = TRUE
+    )
+  } else {
+    cli::cli_abort("Unsupported dataset type {.val {type}}")
+  }
+}
