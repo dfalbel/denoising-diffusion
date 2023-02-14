@@ -59,7 +59,7 @@ fitted <- model %>%
   )
 
 with_no_grad({
-  x <- fitted$model$generate(20, diffusion_steps = 100)$to(device = "cpu")
+  x <- fitted$model$generate(20, diffusion_steps = 20)$to(device = "cpu")
 })
 
 saveRDS(as_array(x), "generated.rds")
