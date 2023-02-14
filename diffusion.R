@@ -1,5 +1,6 @@
 box::use(./unet[unet, swish])
 box::use(torch[...])
+box::use(zeallot[...])
 
 diffusion_schedule <- nn_module(
   initialize = function(min_signal_rate = 0.02, max_signal_rate = 0.95) {
@@ -76,14 +77,13 @@ diffusion <- nn_module(
     self$upsample <- nn_upsample(size = image_size[2:3])
 
     self$activation <- swish()
-    self$conv_out <- nn_conv2d(embedding_dim, image_size[1], kernel_size = 1)
+    self$conv_out <- nn_conv2d(2*embedding_dim, image_size[1], kernel_size = 1)
     purrr::walk(self$conv_out$parameters, nn_init_zeros_)
   },
   forward = function(noisy_images, noise_variances) {
     embedded_variance <- noise_variances |>
       self$embedding() |>
       self$emb_conv() |>
-      self$activation() |>
       self$upsample()
 
     embedded_image <- noisy_images |>
@@ -91,9 +91,10 @@ diffusion <- nn_module(
       self$activation()
 
     unet_input <- torch_cat(list(embedded_variance, embedded_image), dim = 2)
-    unet_input |>
-      self$unet() |>
-      self$activation() |>
+    unet_out <- unet_input |>
+      self$unet()
+
+    torch_cat(list(unet_out, embedded_variance), dim = 2) |>
       self$conv_out()
   }
 )
@@ -106,60 +107,64 @@ diffusion_model <- nn_module(
     self$image_size <- image_size
     self$normalize <- normalize(image_size[1])
   },
-  forward = function(images, diffusion_times = NULL) {
-
-    if (!is.null(ctx$training) && ctx$training) {
-      images <- self$normalize(images)
-    }
-
-    if (is.null(diffusion_times)) {
-      diffusion_times <- torch_rand(images$shape[1], 1, 1, 1, device = images$device)
-    }
-
-    rates <- self$diffusion_schedule(diffusion_times)
-
-    if (!is.null(ctx$training) && ctx$training) {
-      noises <- torch_randn_like(images)
-      noisy_images <- rates$signal * images + rates$noise * noises
-    } else {
-      noises <- torch_zeros_like(images)
-      noisy_images <- images$clone()
-    }
-
-    pred_noises <- self$diffusion(noisy_images, rates$noise^2)
-    pred_images <- (noisy_images - rates$noise * pred_noises) / rates$signal
+  denoise = function(images, rates) {
+    pred_noises <- self$diffusion(images, rates$noise^2)
+    pred_images <- (images - rates$noise * pred_noises) / rates$signal
 
     list(
-      noises = noises,
-      images = images,
       pred_noises = pred_noises,
       pred_images = pred_images
     )
   },
-  loss = function(inputs, targets) {
-    nnf_l1_loss(inputs$noises, inputs$pred_noises)
+  forward = function(images, rates) {
+    self$denoise(images, rates)
   },
-  generate = function(num_images, diffusion_steps = 20) {
-    device <- self$parameters[[1]]$device
+  step = function() {
+    images <- ctx$model$normalize(ctx$input)
 
-    initial_noise <- torch_randn(c(num_images, self$image_size), device=device)
+    diffusion_times <- torch_rand(images$shape[1], 1, 1, 1, device = images$device)
+    rates <- self$diffusion_schedule(diffusion_times)
+
+    noises <- torch_clip(torch_randn_like(images), -1, 1)
+    images <- rates$signal * images + rates$noise * noises
+
+    c(pred_noises, pred_images) %<-% ctx$model(images, rates)
+    loss <- nnf_l1_loss(noises, pred_noises)
+
+    ctx$opt$zero_grad()
+    loss$backward()
+    ctx$opt$step()
+
+    ctx$loss[[ctx$opt_name]] <- loss$detach()
+  },
+  reverse_diffusion = function(initial_noise, diffusion_steps) {
     step_size <- 1.0 / diffusion_steps
 
     next_noisy_images <- initial_noise
+
+    diffusion_times <- torch_ones(c(initial_noise$shape[1], 1, 1, 1), device = ctx$accelerator$device)
+    rates <- self$diffusion_schedule(diffusion_times)
+
     for (step in seq_len(diffusion_steps)) {
       noisy_images <- next_noisy_images
 
-      diffusion_times <- torch_ones(c(num_images, 1, 1, 1), device = device) - (step-1) * step_size
-      res <- self$forward(noisy_images, diffusion_times)
+      c(pred_noises, pred_images) %<-% self$denoise(noisy_images, rates)
 
       # remix the predicted components using the next signal and noise rates
-      next_diffusion_times <- diffusion_times - step_size
-      rates <- self$diffusion_schedule(next_diffusion_times)
+      diffusion_times <- diffusion_times - step_size
+      rates <- self$diffusion_schedule(diffusion_times)
 
-      next_noisy_images <- rates$signal * res$pred_images + rates$noise * res$pred_noises
+      next_noisy_images <- rates$signal * pred_images + rates$noise * pred_noises
     }
 
-    self$normalize$denormalize(res$pred_images)
+    pred_images |>
+      self$normalize$denormalize() |>
+      torch_clip(0, 1)
+  },
+  generate = function(num_images, diffusion_steps = 20) {
+    device <- ctx$accelerator$device
+    initial_noise <- torch_randn(c(num_images, self$image_size), device=device)
+    self$reverse_diffusion(initial_noise)
   }
 )
 
