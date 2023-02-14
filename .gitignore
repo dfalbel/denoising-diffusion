@@ -3,3 +3,6 @@
 .Rdata
 .httr-oauth
 .DS_Store
+generated.rds
+luz_model.luz
+data
