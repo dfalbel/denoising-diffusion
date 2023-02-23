@@ -15,8 +15,10 @@ callback_generate_samples <- luz_callback(
     )
   },
   on_epoch_end = function () {
-    images <- ctx$model$reverse_diffusion(self$initial_noise, self$diffusion_steps)
-    images <- images$permute(c(1,3,4,2))$to(dtype = torch_float(), device = "cpu")
+    with_no_grad({
+      images <- ctx$model$reverse_diffusion(self$initial_noise, self$diffusion_steps)
+      images <- images$permute(c(1,3,4,2))$to(dtype = torch_float(), device = "cpu")
+    })
     log_event(
       imgs = summary_image(as.array(images), step = ctx$epoch)
     )

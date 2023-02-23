@@ -44,6 +44,7 @@ make_dataset <- function(type = c("pets", "flowers"), image_size) {
   if (type == "pets") {
     diffusion_dataset(
       torchdatasets::oxford_pet_dataset,
+      target_type = "species",
       image_size,
       split = "train",
       download = TRUE
