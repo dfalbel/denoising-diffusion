@@ -76,6 +76,7 @@ up_block <- nn_module(
     self$conv_out <- nn_conv2d(in_channels, out_channels, kernel_size=1, padding="same")
   },
   forward = function(x, skips) {
+
     x <- x |> self$upsample()
 
     for (block in seq_len(length(self$resnet_blocks))) {

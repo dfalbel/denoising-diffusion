@@ -27,12 +27,14 @@ normalize <- nn_module(
   },
   forward = function(x) {
 
-    if (self$step < self$num_steps) {
-      self$step <- self$step + 1
-      self$update_stats(x)
-    }
+    # if (self$step < self$num_steps) {
+    #   self$step <- self$step + 1
+    #   self$update_stats(x)
+    # }
+    #
+    # (x - self$means) / self$stds
 
-    (x - self$means) / self$stds
+    x*2-1
   },
   update_stats = function(x) {
     means <- torch_mean(x, dim = c(1,3,4), keepdim = TRUE)
@@ -49,12 +51,13 @@ normalize <- nn_module(
       mul_(1-w)$
       add_(w*vars)$
       add_(correction_factor)$
-      sqrt()
+      sqrt_()
 
     self$sample_size <- self$sample_size + sample_size
   },
   denormalize = function(x) {
-    x * self$stds + self$means
+    #x * self$stds + self$means
+    (x + 1)/2
   }
 )
 
@@ -114,7 +117,7 @@ diffusion <- nn_module(
 )
 
 diffusion_model <- nn_module(
-  initialize = function(image_size, embedding_dim = 64, widths = c(64, 96, 128, 192), block_depth = 2,
+  initialize = function(image_size, embedding_dim = 32, widths = c(32, 64, 96, 128), block_depth = 2,
                         signal_rate = c(0.02, 0.95), loss = NULL) {
     self$diffusion <- diffusion(image_size, embedding_dim, widths, block_depth)
     self$diffusion_schedule <- diffusion_schedule(signal_rate[1], signal_rate[2])
