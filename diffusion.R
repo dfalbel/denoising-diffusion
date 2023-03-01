@@ -78,17 +78,18 @@ diffusion <- nn_module(
 
     self$activation <- swish()
     self$conv_out <- nn_sequential(
-      nn_conv2d(2*embedding_dim, embedding_dim, kernel_size = 3, padding = "same"),
+      nn_conv2d(embedding_dim, embedding_dim, kernel_size = 3, padding = "same"),
       swish(),
       nn_conv2d(embedding_dim, image_size[1], kernel_size = 1, padding = "same")
     )
-    #purrr::walk(self$conv_out$parameters, nn_init_zeros_)
+    purrr::walk(self$conv_out[[3]]$parameters, nn_init_zeros_)
   },
   forward = function(noisy_images, noise_variances) {
     embedded_variance <- noise_variances |>
       self$embedding() |>
       self$upsample() |>
-      self$emb_conv()
+      self$emb_conv() |>
+      self$activation()
 
     embedded_image <- noisy_images |>
       self$conv() |>
@@ -96,15 +97,13 @@ diffusion <- nn_module(
 
     unet_input <- torch_cat(list(embedded_variance, embedded_image), dim = 2)
     unet_out <- unet_input |>
-      self$unet()
-
-    torch_cat(list(unet_out, embedded_variance), dim = 2) |>
+      self$unet() |>
       self$conv_out()
   }
 )
 
 diffusion_model <- nn_module(
-  initialize = function(image_size, embedding_dim = 32, widths = c(32, 64, 96, 128), block_depth = 2,
+  initialize = function(image_size, embedding_dim = 64, widths = c(64, 96, 128, 192), block_depth = 2,
                         signal_rate = c(0.02, 0.95), loss = NULL) {
     self$diffusion <- diffusion(image_size, embedding_dim, widths, block_depth)
     self$diffusion_schedule <- diffusion_schedule(signal_rate[1], signal_rate[2])

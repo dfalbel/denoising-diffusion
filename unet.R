@@ -1,21 +1,6 @@
 box::use(torch[...])
 box::use(purrr[map])
 
-downsample <- nn_module(
-  initialize = function(in_channels, out_channels) {
-    self$conv <- nn_conv2d(
-      in_channels = in_channels,
-      out_channels = out_channels,
-      kernel_size = 3,
-      stride = 2,
-      padding = 1
-    )
-  },
-  forward = function(input) {
-    self$conv(input)
-  }
-)
-
 swish <- nn_module(
   forward = function(input) {
     input*torch_sigmoid(input)
@@ -88,7 +73,7 @@ up_block <- nn_module(
       !!! map(seq_len(block_depth), \(i) resnet_block(2*in_channels, in_channels))
     ))
 
-    self$conv_out <- nn_conv2d(in_channels, out_channels, kernel_size=3, padding="same")
+    self$conv_out <- nn_conv2d(in_channels, out_channels, kernel_size=1, padding="same")
   },
   forward = function(x, skips) {
     x <- x |> self$upsample()

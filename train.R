@@ -1,9 +1,6 @@
 #| requires:
 #|  - file: data
 #|    target-type: link
-#| train:
-#|  sourcecode:
-#|    - '*.R'
 #| output-scalars:
 #|   - '(\key): (\value)'
 
@@ -16,7 +13,7 @@ box::use(./callbacks[callback_generate_samples])
 tfevents::set_default_logdir(fs::path("logs", gsub("[:punct: -]", "", lubridate::now())))
 
 block_depth <- 2
-lr <- 1e-3
+lr <- 1e-4
 optimizer <- "adamw"
 batch_size <- 64
 epochs <- 1000
@@ -72,9 +69,8 @@ with_no_grad({
   x <- fitted$model$normalize$denormalize(fitted$model$generate(20, diffusion_steps = 20)$to(device = "mps"))
 })
 
-saveRDS(as_array(x), "generated.rds")
-luz_save(fitted, path = "luz_model.luz")
 
+luz_save(fitted, path = "luz_model.luz")
 to_cpu <- function(x) x$to(device="cpu")
 
 for (i in 1:20) {
