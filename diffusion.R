@@ -23,6 +23,7 @@ normalize <- nn_module(
     self$stds <- nn_buffer(torch_zeros(1, num_channels, 1, 1))
     self$step <- 0
     self$num_steps <- num_steps
+    self$sample_size <- 0
   },
   forward = function(x) {
 
@@ -37,10 +38,20 @@ normalize <- nn_module(
     means <- torch_mean(x, dim = c(1,3,4), keepdim = TRUE)
     vars <- torch_var(x, dim = c(1,3,4), keepdim = TRUE)
 
-    w <- 1 / self$step
+    sample_size <- x$size(1)
+    total_size <- self$sample_size + sample_size
+
+    w <- sample_size / total_size
+    correction_factor <- sample_size * self$sample_size / (total_size^2) * ((self$means - means)^2)
 
     self$means$mul_(1-w)$add_(w*means)
-    self$stds$pow_(2)$mul_(1-w)$add_(w*vars)$sqrt_()
+    self$stds$pow_(2)$
+      mul_(1-w)$
+      add_(w*vars)$
+      add_(correction_factor)$
+      sqrt()
+
+    self$sample_size <- self$sample_size + sample_size
   },
   denormalize = function(x) {
     x * self$stds + self$means
