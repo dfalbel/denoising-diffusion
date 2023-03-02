@@ -91,19 +91,13 @@ diffusion <- nn_module(
     self$upsample <- nn_upsample(size = image_size[2:3])
 
     self$activation <- swish()
-    self$conv_out <- nn_sequential(
-      nn_conv2d(embedding_dim, embedding_dim, kernel_size = 3, padding = "same"),
-      swish(),
-      nn_conv2d(embedding_dim, image_size[1], kernel_size = 1, padding = "same")
-    )
-    purrr::walk(self$conv_out[[3]]$parameters, nn_init_zeros_)
+    self$conv_out <- nn_conv2d(embedding_dim, image_size[1], kernel_size = 1, padding = "same")
+    purrr::walk(self$conv_out$parameters, nn_init_zeros_)
   },
   forward = function(noisy_images, noise_variances) {
     embedded_variance <- noise_variances |>
       self$embedding() |>
-      self$upsample() |>
-      self$emb_conv() |>
-      self$activation()
+      self$upsample()
 
     embedded_image <- noisy_images |>
       self$conv() |>

@@ -18,7 +18,7 @@ box::use(torch[...])
 box::use(./diffusion[sinusoidal_embedding, diffusion_schedule])
 
 schedule <- diffusion_schedule()
-embedding <- sinusoidal_embedding(embedding_min_frequency = 1, 1000, 32)
+embedding <- sinusoidal_embedding()
 
 diffusion_times <- torch_linspace(0, 1, 100)$view(c(100, 1, 1, 1))
 noise_power <- schedule(diffusion_times)$noise^2

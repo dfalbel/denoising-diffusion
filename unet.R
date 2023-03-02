@@ -70,10 +70,10 @@ up_block <- nn_module(
     self$upsample <- nn_upsample(scale_factor = 2, mode = "bilinear")
 
     self$resnet_blocks <- nn_module_list(rlang::list2(
-      !!! map(seq_len(block_depth), \(i) resnet_block(2*in_channels, in_channels))
+      !!! map(seq_len(block_depth - 1), \(i) resnet_block(2*in_channels, in_channels)),
+      resnet_block(2*in_channels, out_channels)
     ))
 
-    self$conv_out <- nn_conv2d(in_channels, out_channels, kernel_size=1, padding="same")
   },
   forward = function(x, skips) {
 
@@ -84,7 +84,7 @@ up_block <- nn_module(
       x <- self$resnet_blocks[[block]](x)
     }
 
-    self$conv_out(x)
+    x
   }
 )
 
@@ -101,12 +101,9 @@ unet <- nn_module(
     widths <- rev(widths)
     for (i in seq_along(widths)) {
       self$up_blocks$append(
-        up_block(widths[i], widths[i+1] %|% in_channels, block_depth)
+        up_block(widths[i], widths[i+1] %|% out_channels, block_depth)
       )
     }
-
-    self$activation <- swish()
-    self$conv <- nn_conv2d(in_channels, out_channels, kernel_size = 1)
   },
   forward = function(x) {
 
@@ -121,9 +118,7 @@ unet <- nn_module(
       output <- self$up_blocks[[i]](output, rev(skips[[i]]$skips))
     }
 
-    output |>
-      self$activation() |>
-      self$conv()
+    output
   }
 )
 
