@@ -3,7 +3,7 @@ box::use(torch[...])
 box::use(zeallot[...])
 
 diffusion_schedule <- nn_module(
-  initialize = function(min_signal_rate = 0.02, max_signal_rate = 0.95) {
+  initialize = function(min_signal_rate = 0.02, max_signal_rate = 0.98) {
     self$start_angle <- nn_buffer(torch_acos(max_signal_rate))
     self$end_angle <- nn_buffer(torch_acos(min_signal_rate))
   },
@@ -76,7 +76,7 @@ sinusoidal_embedding <- nn_module(
       torch_sin(embeddings),
       torch_cos(embeddings)
     ))
-    torch_transpose(out, 4, 2)
+    out$permute(c(1,4,2,3))
   }
 )
 

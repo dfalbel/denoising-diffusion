@@ -1,0 +1,27 @@
+---
+title: "Denoising Diffusion Implicit Models"
+format: gfm
+editor: visual
+bibliography: references.bib
+---
+
+This repository contains a torch/luz implementation of the Denoising Diffusion Implicit Models. Code in this repository is heavily influenced by code in @kerasDDIM which is mostly based on [@song2020] with a few ideas coming from [@nichol2021] and [@karras2022].
+
+The main code entry point is the `train.R` script used for start training. The network architecture and training loop are defined in `diffusion.R`.
+
+## Sinusoidal embedding
+
+A sinusoidal embedding is used to encode the diffusion times into the model. The visualization below shows how diffusion times are mapped to the embedding - assuming the dimension size of 32. Each row is a embedding vector given the diffusion time. Sinusoidal embedding have nice properties, like preserving the relative distances [@kazemnejad2019:pencoding].
+
+```{r sinusoidal, echo=FALSE}
+box::use(torch[...])
+box::use(./diffusion[sinusoidal_embedding, diffusion_schedule])
+
+schedule <- diffusion_schedule()
+embedding <- sinusoidal_embedding(embedding_min_frequency = 1, 1000, 32)
+
+diffusion_times <- torch_linspace(0, 1, 100)$view(c(100, 1, 1, 1))
+noise_power <- schedule(diffusion_times)$noise^2
+embeddings <- embedding(noise_power)$add(1)$div(2)$squeeze(3)$squeeze(3)
+heatmap(as.array(embeddings), Rowv=NA, Colv=NA, col = colorspace::diverge_hsv(50), scale = "none", labRow = sprintf("%.2f", seq(0,1,length.out = 100)))
+```
