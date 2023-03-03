@@ -13,7 +13,7 @@ box::use(./callbacks[callback_generate_samples])
 tfevents::set_default_logdir(fs::path("logs", gsub("[:punct: -]", "", lubridate::now())))
 
 block_depth <- 2
-lr <- 1e-4
+lr <- 1e-3
 optimizer <- "adamw"
 batch_size <- 64
 epochs <- 1000
@@ -22,9 +22,10 @@ max_signal_rate <- 0.95
 patience <- 200
 weight_decay <- 1e-4
 loss <- "l1"
-dataset_name <- "pets"
+embedding_dim <- 32
+dataset_name <- "flowers"
 
-image_size <- c(3 , 64, 64)
+image_size <- c(3, 64, 64)
 
 optimizer <- if (optimizer == "adam") {
   optim_adam
@@ -48,7 +49,9 @@ model <- diffusion_model %>%
     image_size = image_size,
     block_depth = block_depth,
     signal_rate = c(min_signal_rate, max_signal_rate),
-    loss = loss
+    loss = loss,
+    widths = c(32, 64, 96, 128),
+    embedding_dim = embedding_dim
   ) %>%
   set_opt_hparams(lr = lr, weight_decay = weight_decay)
 
@@ -66,7 +69,7 @@ fitted <- model %>%
   )
 
 with_no_grad({
-  x <- fitted$model$normalize$denormalize(fitted$model$generate(20, diffusion_steps = 20)$to(device = "mps"))
+  x <- fitted$model$generate(20, diffusion_steps = 5)$to(device = "mps")
 })
 
 
@@ -74,10 +77,8 @@ luz_save(fitted, path = "luz_model.luz")
 to_cpu <- function(x) x$to(device="cpu")
 
 for (i in 1:20) {
-  x[i,..] %>%
+  x[i,..]$permute(c(2,3,1)) %>%
     to_cpu() %>%
-    torch_transpose(1,3) %>%
-    torch_transpose(1,2) %>%
     torch_clip(0, 1) %>%
     as_array() %>%
     as.raster() %>%

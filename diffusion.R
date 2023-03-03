@@ -18,7 +18,7 @@ diffusion_schedule <- nn_module(
 )
 
 normalize <- nn_module(
-  initialize = function(num_channels, num_steps = 20) {
+  initialize = function(num_channels, num_steps = 55) {
     self$means <- nn_buffer(torch_zeros(1, num_channels, 1, 1))
     self$stds <- nn_buffer(torch_zeros(1, num_channels, 1, 1))
     self$step <- 0
@@ -27,14 +27,14 @@ normalize <- nn_module(
   },
   forward = function(x) {
 
-    # if (self$step < self$num_steps) {
-    #   self$step <- self$step + 1
-    #   self$update_stats(x)
-    # }
-    #
-    # (x - self$means) / self$stds
+    if (self$step < self$num_steps) {
+      self$step <- self$step + 1
+      self$update_stats(x)
+    }
 
-    x*2-1
+    (x - self$means) / self$stds
+
+    #x*2-1
   },
   update_stats = function(x) {
     means <- torch_mean(x, dim = c(1,3,4), keepdim = TRUE)
@@ -56,8 +56,8 @@ normalize <- nn_module(
     self$sample_size <- self$sample_size + sample_size
   },
   denormalize = function(x) {
-    #x * self$stds + self$means
-    (x + 1)/2
+    x * self$stds + self$means
+    #(x + 1)/2
   }
 )
 
@@ -86,7 +86,6 @@ diffusion <- nn_module(
     self$embedding <- sinusoidal_embedding(embedding_dim = embedding_dim)
 
     self$conv <- nn_conv2d(image_size[1], embedding_dim, kernel_size = 1)
-    self$emb_conv <- nn_conv2d(embedding_dim, embedding_dim, kernel_size = 1)
 
     self$upsample <- nn_upsample(size = image_size[2:3])
 
@@ -100,12 +99,11 @@ diffusion <- nn_module(
       self$upsample()
 
     embedded_image <- noisy_images |>
-      self$conv() |>
-      self$activation()
+      self$conv()
 
-    unet_input <- torch_cat(list(embedded_variance, embedded_image), dim = 2)
-    unet_out <- unet_input |>
-      self$unet() |>
+    unet_input <- torch_cat(list(embedded_image, embedded_variance), dim = 2)
+    unet_input %>%
+      self$unet() %>%
       self$conv_out()
   }
 )
