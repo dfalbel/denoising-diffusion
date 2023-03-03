@@ -56,15 +56,16 @@ down_block <- nn_module(
     self$downsample <- nn_avg_pool2d(kernel_size = c(2,2))
   },
   forward = function(x) {
-    skip <- x
-    for (block in seq_along(self$resnet_blocks)) {
-      x <- self$resnet_blocks[[block]](x)
+    skips <- list()
+    for (i in seq_along(self$resnet_blocks)) {
+      x <- self$resnet_blocks[[i]](x)
+      skips[[i]] <- x
     }
 
     output <- self$downsample(x)
     list(
       output = output,
-      skips = skip
+      skips = skips
     )
   }
 )
@@ -74,20 +75,20 @@ up_block <- nn_module(
     self$upsample <- nn_upsample(scale_factor = 2, mode = "bilinear")
 
     self$resnet_blocks <- nn_module_list(rlang::list2(
-      resnet_block(in_channels + out_channels, out_channels),
-      !!! map(seq_len(block_depth - 1), \(i) resnet_block(out_channels, out_channels))
+      resnet_block(2*in_channels, out_channels),
+      !!! map(seq_len(block_depth - 1), \(i) resnet_block(out_channels + in_channels, out_channels))
     ))
 
     self$in_channels <- in_channels
     self$out_channels <- out_channels
     self$block_depth <- block_depth
   },
-  forward = function(x, skip) {
+  forward = function(x, skips) {
     x <- x |> self$upsample()
-    x <- torch_cat(list(x, skip), dim = 2)
 
-    for (block in seq_len(length(self$resnet_blocks))) {
-      x <- self$resnet_blocks[[block]](x)
+    for (i in seq_len(length(self$resnet_blocks))) {
+      x <- torch_cat(list(x, skips[[i]]), dim = 2)
+      x <- self$resnet_blocks[[i]](x)
     }
 
     x
@@ -134,7 +135,7 @@ unet <- nn_module(
 
     skips <- rev(skips)
     for (i in seq_along(self$up_blocks)) {
-      x <- self$up_blocks[[i]](x, skips[[i]])
+      x <- self$up_blocks[[i]](x, rev(skips[[i]]))
     }
 
     self$out_block(x)
