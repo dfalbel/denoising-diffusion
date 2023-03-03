@@ -102,7 +102,7 @@ diffusion <- nn_module(
       self$conv()
 
     unet_input <- torch_cat(list(embedded_image, embedded_variance), dim = 2)
-    unet_input %>%
+    unet_output <- unet_input %>%
       self$unet() %>%
       self$conv_out()
   }
@@ -176,6 +176,16 @@ diffusion_model <- nn_module(
     self$reverse_diffusion(initial_noise, diffusion_steps = diffusion_steps)
   }
 )
+
+# img <- dataset[8]$x$to(device="mps") %>%
+#   fitted$model$normalize() %>%
+#   fitted$model$normalize$denormalize() %>%
+#   torch_clip(0,1)
+# img[1,..]$permute(c(2,3,1))$cpu() %>%
+#   as.array() %>%
+#   as.raster() %>%
+#   plot()
+
 
 # model <- diffusion_model(c(3, 32, 32))
 # diffusion_times <- torch_rand(32)

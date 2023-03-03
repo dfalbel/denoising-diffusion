@@ -21,15 +21,15 @@ resnet_block <- nn_module(
       out_channels,
       kernel_size = kernel_size,
       padding = "same",
-      bias = FALSE
+      bias = TRUE
     )
-    self$batch_norm1 <- nn_batch_norm2d(num_features = out_channels)
+    self$batch_norm1 <- nn_batch_norm2d(num_features = in_channels, affine = FALSE)
     self$conv2 <- nn_conv2d(
       out_channels,
       out_channels,
       kernel_size = kernel_size,
       padding = "same",
-      bias = FALSE
+      bias = TRUE
     )
     self$batch_norm2 <- nn_batch_norm2d(num_features = out_channels)
     self$activation <- swish()
@@ -37,12 +37,11 @@ resnet_block <- nn_module(
   forward = function(input) {
     resid <- input |> self$conv_res()
     output <- input |>
-      self$conv1() |>
       self$batch_norm1() |>
+      self$conv1() |>
       self$activation() |>
-      self$conv2() |>
-      self$batch_norm2()
-    self$activation(resid + output)
+      self$conv2()
+    resid + output
   }
 )
 
@@ -104,6 +103,13 @@ unet <- nn_module(
       )
     }
 
+    self$mid_blocks <- nn_module_list()
+    for (i in seq_len(block_depth)) {
+      self$mid_blocks$append(
+        resnet_block(utils::tail(widths, 1), utils::tail(widths, 1))
+      )
+    }
+
     self$up_blocks <- nn_module_list()
     widths <- rev(widths)
     for (i in seq_along(widths)) {
@@ -122,8 +128,11 @@ unet <- nn_module(
       skips[[i]] <- skip
     }
 
-    skips <- rev(skips)
+    for (i in seq_along(self$mid_blocks)) {
+      x <- self$mid_blocks[[i]](x)
+    }
 
+    skips <- rev(skips)
     for (i in seq_along(self$up_blocks)) {
       x <- self$up_blocks[[i]](x, skips[[i]])
     }
