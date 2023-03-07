@@ -86,11 +86,9 @@ diffusion <- nn_module(
     self$embedding <- sinusoidal_embedding(embedding_dim = embedding_dim)
 
     self$conv <- nn_conv2d(image_size[1], embedding_dim, kernel_size = 1)
-
     self$upsample <- nn_upsample(size = image_size[2:3])
 
-    self$activation <- swish()
-    self$conv_out <- nn_conv2d(embedding_dim, image_size[1], kernel_size = 1, padding = "same")
+    self$conv_out <- nn_conv2d(embedding_dim, image_size[1], kernel_size = 1)
     purrr::walk(self$conv_out$parameters, nn_init_zeros_)
   },
   forward = function(noisy_images, noise_variances) {
@@ -132,7 +130,7 @@ diffusion_model <- nn_module(
     self$denoise(images, rates)
   },
   step = function() {
-    images <- ctx$model$normalize(ctx$input)
+    ctx$input <- images <- ctx$model$normalize(ctx$input)
 
     diffusion_times <- torch_rand(images$shape[1], 1, 1, 1, device = images$device)
     rates <- self$diffusion_schedule(diffusion_times)
@@ -140,8 +138,8 @@ diffusion_model <- nn_module(
     noises <- torch_randn_like(images)
     images <- rates$signal * images + rates$noise * noises
 
-    c(pred_noises, pred_images) %<-% ctx$model(images, rates)
-    loss <- self$loss(noises, pred_noises)
+    ctx$pred <- ctx$model(images, rates)
+    loss <- self$loss(noises, ctx$pred$pred_noises)
 
     ctx$opt$zero_grad()
     loss$backward()
@@ -193,4 +191,75 @@ diffusion_model <- nn_module(
 # x <- rates$noise
 # a <- sinusoidal_embedding(x)
 # nn_upsample(size = c(64,64))(a$view(c(a$shape, 1, 1)))
+
+
+# generate <- function(fitted) {
+#   model <- fitted$model
+#   model$eval()
+#   initial_noise <- torch_randn(c(20, 3, 64, 64), device=fitted$model$device)
+#
+#   next_noisy_images <- initial_noise
+#   diffusion_steps <- 20
+#   step_size = 1/diffusion_steps
+#
+#   for (step in seq(from = 0, to = diffusion_steps - 1)) {
+#     noisy_images = next_noisy_images
+#
+#     diffusion_times <- torch_ones(c(20, 1, 1, 1), device = model$device) - step * step_size
+#     rates <- model$diffusion_schedule(diffusion_times)
+#
+#     c(pred_noises, pred_images) %<-% model$denoise(next_noisy_images, rates)
+#
+#     next_diffusion_times = diffusion_times - step_size
+#     next_rates = model$diffusion_schedule(next_diffusion_times)
+#     next_noisy_images = next_rates$signal * pred_images + next_rates$noise * pred_noises
+#   }
+#
+#   pred_images |>
+#     model$normalize$denormalize() |>
+#     torch_clip(0, 1) |>
+#     cpu() |>
+#     as.array() |>
+#     aperm(c(1,3,4,2)) |>
+#     subseta(1,,,) |>
+#     as.raster() |>
+#     plot()
+# }
+
+
+# # reverse diffusion = sampling
+# num_images = initial_noise.shape[0]
+# step_size = 1.0 / diffusion_steps
+#
+# # important line:
+# # at the first sampling step, the "noisy image" is pure noise
+# # but its signal rate is assumed to be nonzero (min_signal_rate)
+# next_noisy_images = initial_noise
+# for step in range(diffusion_steps):
+#   noisy_images = next_noisy_images
+#
+# # separate the current noisy image to its components
+# diffusion_times = tf.ones((num_images, 1, 1, 1)) - step * step_size
+# noise_rates, signal_rates = self.diffusion_schedule(diffusion_times)
+# pred_noises, pred_images = self.denoise(
+#   noisy_images, noise_rates, signal_rates, training=False
+# )
+# # network used in eval mode
+#
+# # remix the predicted components using the next signal and noise rates
+# next_diffusion_times = diffusion_times - step_size
+# next_noise_rates, next_signal_rates = self.diffusion_schedule(
+#   next_diffusion_times
+# )
+# next_noisy_images = (
+#   next_signal_rates * pred_images + next_noise_rates * pred_noises
+# )
+# # this new noisy image will be used in the next step
+# subseta <- function(x, ...) {
+#   x[...]
+# }
+#
+# cpu <- function(x) {
+#   x$cpu()
+# }
 

@@ -1,8 +1,15 @@
 box::use(torch[...])
 box::use(torchvision[...])
 box::use(torchdatasets[...])
+box::use(zeallot[...])
 
 dir <- "./data" #caching directory
+
+tf_resize <- function(x, size) {
+  x <- aperm(as.array(x), c(2, 3, 1))
+  x <- tensorflow::tf$image$resize(x, as.integer(size), antialias = TRUE)
+  torch_tensor(aperm(as.array(x, c(3,1,2))))
+}
 
 diffusion_dataset <- dataset(
   "DiffusionDataset",
@@ -11,8 +18,14 @@ diffusion_dataset <- dataset(
     self$image_size <- image_size
 
     self$transform <- function(x) {
-      x |>
-        transform_to_tensor() |>
+      img <- x |>
+        transform_to_tensor()
+
+      c(ch, height, width) %<-% img$size()
+      crop_size <- min(height, width)
+
+      img |>
+        transform_center_crop(c(crop_size, crop_size)) |>
         transform_resize(self$image_size)
     }
 

@@ -23,7 +23,7 @@ resnet_block <- nn_module(
       padding = "same",
       bias = TRUE
     )
-    self$batch_norm1 <- nn_batch_norm2d(num_features = in_channels, affine = FALSE)
+    self$batch_norm1 <- nn_batch_norm2d(num_features = in_channels)
     self$conv2 <- nn_conv2d(
       out_channels,
       out_channels,
@@ -31,7 +31,6 @@ resnet_block <- nn_module(
       padding = "same",
       bias = TRUE
     )
-    self$batch_norm2 <- nn_batch_norm2d(num_features = out_channels)
     self$activation <- swish()
   },
   forward = function(input) {
@@ -41,7 +40,7 @@ resnet_block <- nn_module(
       self$conv1() |>
       self$activation() |>
       self$conv2()
-    resid + output
+   resid + output
   }
 )
 
@@ -96,7 +95,7 @@ up_block <- nn_module(
 )
 
 unet <- nn_module(
-  initialize = function(in_channels, out_channels, widths = c(64, 96, 128, 160), block_depth = 2) {
+  initialize = function(in_channels, out_channels, widths, block_depth) {
     self$down_blocks <- nn_module_list()
     for (i in seq_along(widths)) {
       self$down_blocks$append(
@@ -105,21 +104,20 @@ unet <- nn_module(
     }
 
     self$mid_blocks <- nn_module_list()
-    for (i in seq_len(block_depth)) {
-      self$mid_blocks$append(
-        resnet_block(utils::tail(widths, 1), utils::tail(widths, 1))
-      )
-    }
+    self$mid_blocks$append(
+      resnet_block(widths[length(widths)], 2*widths[length(widths)])
+    )
+    self$mid_blocks$append(
+      resnet_block(2*widths[length(widths)], widths[length(widths)])
+    )
 
     self$up_blocks <- nn_module_list()
     widths <- rev(widths)
     for (i in seq_along(widths)) {
       self$up_blocks$append(
-        up_block(widths[i], widths[i+1] %|% in_channels, block_depth)
+        up_block(widths[i], widths[i+1] %|% out_channels, block_depth)
       )
     }
-
-    self$out_block <- resnet_block(in_channels, out_channels)
   },
   forward = function(x) {
 
@@ -138,7 +136,7 @@ unet <- nn_module(
       x <- self$up_blocks[[i]](x, rev(skips[[i]]))
     }
 
-    self$out_block(x)
+    x
   }
 )
 
@@ -147,4 +145,3 @@ unet <- nn_module(
     y
   else x
 }
-
