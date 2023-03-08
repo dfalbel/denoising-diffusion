@@ -66,25 +66,9 @@ fitted <- model %>%
       luz_callback_lr_scheduler(lr_step, step_size = patience/2, gamma = 0.1^(1/3)),
       luz_callback_early_stopping(monitor = "train_loss", min_delta = 0.0005, patience = patience),
       callback_generate_samples(num_images = 20, diffusion_steps = 20),
-      luz_callback_tfevents(logdir = logdir, histograms = TRUE)
+      luz_callback_tfevents(logdir = logdir, histograms = TRUE),
+      luz_callback_gradient_clip()
     )
   )
 
-with_no_grad({
-  fitted$model$eval()
-  x <- fitted$model$generate(20, diffusion_steps = 5)$to(device = "mps")
-})
-
-
 luz_save(fitted, path = "luz_model.luz")
-to_cpu <- function(x) x$to(device="cpu")
-
-for (i in 1:20) {
-  x[i,..]$permute(c(2,3,1)) %>%
-    to_cpu() %>%
-    torch_clip(0, 1) %>%
-    as_array() %>%
-    as.raster() %>%
-    plot()
-}
-

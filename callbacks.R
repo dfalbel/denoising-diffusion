@@ -18,11 +18,13 @@ callback_generate_samples <- luz_callback(
     ctx$model$eval()
     with_no_grad({
       images <- ctx$model$reverse_diffusion(self$initial_noise, self$diffusion_steps)
+      plot_tensors(images, identity)
       images <- images$permute(c(1,3,4,2))$to(dtype = torch_float(), device = "cpu")
     })
     log_event(
       imgs = summary_image(as.array(images), step = ctx$epoch)
     )
+
     ctx$model$train()
   }
 )
@@ -36,7 +38,7 @@ image_loss <- luz_metric(
   }
 )
 
-plot_tensors <- function(x, denormalize, ncol = 6) {
+plot_tensors <- function(x, denormalize = identity, ncol = 6) {
   if (inherits(x, "torch_tensor"))
     x <- torch::torch_unbind(x)
 

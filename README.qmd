@@ -25,3 +25,25 @@ noise_power <- schedule(diffusion_times)$noise^2
 embeddings <- embedding(noise_power)$add(1)$div(2)$squeeze(3)$squeeze(3)
 heatmap(as.array(embeddings), Rowv=NA, Colv=NA, col = colorspace::diverge_hsv(50), scale = "none", labRow = sprintf("%.2f", seq(0,1,length.out = 100)))
 ```
+
+## Sampling images
+
+Images can be sampled from the model using the `generate` method. Remember to always
+set the model into `eval()` mode before sampling, so the batch normal layers are correctly
+applied.
+
+```{r samples}
+box::use(torch[...])
+box::use(./callbacks[plot_tensors])
+
+fitted <- luz::luz_load("luz_model.luz")
+
+with_no_grad({
+  fitted$model$eval()
+  x <- fitted$model$generate(36, diffusion_steps = 5)$to(device = "mps")
+})
+
+plot_tensors(x)
+```
+
+## References

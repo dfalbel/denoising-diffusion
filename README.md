@@ -22,6 +22,30 @@ nice properties, like preserving the relative distances (Kazemnejad
 
 ![](README_files/figure-commonmark/sinusoidal-1.png)
 
+## Sampling images
+
+Images can be sampled from the model using the `generate` method.
+Remember to always set the model into `eval()` mode before sampling, so
+the batch normal layers are correctly applied.
+
+``` r
+box::use(torch[...])
+box::use(./callbacks[plot_tensors])
+
+fitted <- luz::luz_load("luz_model.luz")
+
+with_no_grad({
+  fitted$model$eval()
+  x <- fitted$model$generate(36, diffusion_steps = 5)$to(device = "mps")
+})
+
+plot_tensors(x)
+```
+
+![](README_files/figure-commonmark/samples-1.png)
+
+## References
+
 <div id="refs" class="references csl-bib-body hanging-indent">
 
 <div id="ref-kerasDDIM" class="csl-entry">
