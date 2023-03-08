@@ -141,9 +141,11 @@ diffusion_model <- nn_module(
     ctx$pred <- ctx$model(images, rates)
     loss <- self$loss(noises, ctx$pred$pred_noises)
 
-    ctx$opt$zero_grad()
-    loss$backward()
-    ctx$opt$step()
+    if (ctx$training) {
+      ctx$opt$zero_grad()
+      loss$backward()
+      ctx$opt$step()
+    }
 
     ctx$loss[[ctx$opt_name]] <- loss$detach()
   },

@@ -66,11 +66,19 @@ make_dataset <- function(type = c("pets", "flowers", "debug"), image_size) {
       download = TRUE
     )
   } else if (type == "flowers") {
-    diffusion_dataset(
-      torchdatasets::oxford_flowers102_dataset,
-      image_size,
-      split = c("train", "test"),
-      download = TRUE
+    list(
+      diffusion_dataset(
+        torchdatasets::oxford_flowers102_dataset,
+        image_size,
+        split = c("train", "test"),
+        download = TRUE
+      ),
+      diffusion_dataset(
+        torchdatasets::oxford_flowers102_dataset,
+        image_size,
+        split = c("valid"),
+        download = TRUE
+      )
     )
   } else if (type == "debug") {
     debug_dataset(diffusion_dataset(
@@ -84,3 +92,4 @@ make_dataset <- function(type = c("pets", "flowers", "debug"), image_size) {
     cli::cli_abort("Unsupported dataset type {.val {type}}")
   }
 }
+
