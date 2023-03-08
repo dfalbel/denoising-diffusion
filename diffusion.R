@@ -56,8 +56,8 @@ normalize <- nn_module(
     self$sample_size <- self$sample_size + sample_size
   },
   denormalize = function(x) {
-    x * self$stds + self$means
-    #(x + 1)/2
+    out <- x * self$stds + self$means
+    torch_clip(out, 0, 1)
   }
 )
 
@@ -167,9 +167,7 @@ diffusion_model <- nn_module(
       noisy_images <- rates$signal * pred_images + rates$noise * pred_noises
     }
 
-    pred_images |>
-      self$normalize$denormalize() |>
-      torch_clip(0, 1)
+    self$normalize$denormalize(pred_images)
   },
   generate = function(num_images, diffusion_steps = 20) {
     initial_noise <- torch_randn(c(num_images, self$image_size), device=self$device)

@@ -43,10 +43,18 @@ inception_encoder <- torch::nn_module(
     self$inception <- torchvision::model_inception_v3(pretrained = TRUE)
     self$inception$fc <- torch::nn_identity()
     self$kid_image_size <- kid_image_size
+    self$transform_normalize <- function(x) {
+      torchvision::transform_normalize(
+        x,
+        mean = c(0.485, 0.456, 0.406),
+        std = c(0.229, 0.224, 0.225)
+      )
+    }
   },
   forward = function(x) {
     x |>
-      torchvision::transform_resize(self$kid_image_size) |> # minimum size accepted by the inception net
+      self$transform_normalize() |>
+      torchvision::transform_resize(self$kid_image_size, interpolation = 2) |> # minimum size accepted by the inception net
       self$inception()
   }
 )
@@ -77,7 +85,7 @@ metric_kid <- luz_metric(
 
     # estimate the squared maximum mean discrepancy using the average kernel values
     batch_size <- real_features$shape[1]
-    mean_kernel_real = torch_sum(kernel_real * (1.0 - torch_eye(batch_size, device=ctx$device))) /
+    mean_kernel_real <- torch_sum(kernel_real * (1.0 - torch_eye(batch_size, device=ctx$device))) /
       (batch_size * (batch_size - 1.0))
 
     mean_kernel_generated <- torch_sum(kernel_generated * (1.0 - torch_eye(batch_size, device=ctx$device))) /
@@ -87,11 +95,10 @@ metric_kid <- luz_metric(
     kid <- mean_kernel_real + mean_kernel_generated - 2.0 * mean_kernel_cross
 
     self$step <- self$step + 1
-    weight <- 1/self$step
-    self$kid <- self$kid * (1 - weight) + kid$item() * weight
+    self$kid <- self$kid + kid$item()
   },
   compute = function() {
-    as.numeric(self$kid)
+    self$kid / self$step
   }
 )
 
@@ -105,9 +112,7 @@ metric_kid_wrapper <- luz_metric(
   update = function(preds, target) {
     ctx$model$eval()
     with_no_grad({
-      images <- preds$pred_images |>
-        ctx$model$normalize$denormalize() |>
-        torch_clip(0,1)
+      images <- ctx$model$normalize$denormalize(ctx$input)
       generated_images <- ctx$model$generate(
         num_images=images$shape[1],
         diffusion_steps=self$diffusion_steps
