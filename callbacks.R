@@ -39,22 +39,19 @@ image_loss <- luz_metric(
 )
 
 inception_encoder <- torch::nn_module(
-  initialize = function(kid_image_size = c(75, 75)) {
+  initialize = function(kid_image_size = c(299, 299)) {
     self$inception <- torchvision::model_inception_v3(pretrained = TRUE)
     self$inception$fc <- torch::nn_identity()
+    self$inception$eval()
     self$kid_image_size <- kid_image_size
-    self$transform_normalize <- function(x) {
-      torchvision::transform_normalize(
-        x,
-        mean = c(0.485, 0.456, 0.406),
-        std = c(0.229, 0.224, 0.225)
-      )
-    }
   },
   forward = function(x) {
     x |>
-      self$transform_normalize() |>
-      torchvision::transform_resize(self$kid_image_size, interpolation = 2) |> # minimum size accepted by the inception net
+      torchvision::transform_resize(self$kid_image_size) |>
+      torchvision::transform_normalize(
+        mean=c(0.485, 0.456, 0.406),
+        std=c(0.229, 0.224, 0.225)
+      ) |>
       self$inception()
   }
 )
