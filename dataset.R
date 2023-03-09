@@ -66,19 +66,18 @@ make_dataset <- function(type = c("pets", "flowers", "debug"), image_size) {
       download = TRUE
     )
   } else if (type == "flowers") {
+    dataset <- diffusion_dataset(
+      torchdatasets::oxford_flowers102_dataset,
+      image_size,
+      split = c("train", "test", "valid"),
+      download = TRUE
+    )
+    train_indexes <- sample.int(length(dataset), 0.8*length(dataset))
+    valid_indexes <- seq_len(length(dataset))[-train_indexes]
+
     list(
-      diffusion_dataset(
-        torchdatasets::oxford_flowers102_dataset,
-        image_size,
-        split = c("train", "test"),
-        download = TRUE
-      ),
-      diffusion_dataset(
-        torchdatasets::oxford_flowers102_dataset,
-        image_size,
-        split = c("valid"),
-        download = TRUE
-      )
+      dataset_repeat(dataset_subset(dataset, train_indexes)),
+      dataset_repeat(dataset_subset(dataset, valid_indexes))
     )
   } else if (type == "debug") {
     debug_dataset(diffusion_dataset(
@@ -92,4 +91,19 @@ make_dataset <- function(type = c("pets", "flowers", "debug"), image_size) {
     cli::cli_abort("Unsupported dataset type {.val {type}}")
   }
 }
+
+dataset_repeat <- dataset(
+  initialize = function(dataset, repeats = 5) {
+    self$dataset <- dataset
+    self$repeats <- repeats
+    self$data_length <- length(dataset)
+  },
+  .getitem = function(i) {
+    index <- i %% self$data_length + 1
+    self$dataset[index]
+  },
+  .length = function() {
+    self$repeats * self$data_length
+  }
+)
 

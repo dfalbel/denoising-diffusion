@@ -18,7 +18,7 @@ logdir <- fs::path("logs", gsub("[:punct: -]", "", lubridate::now()))
 tfevents::set_default_logdir(logdir)
 
 block_depth <- 2
-lr <- 5e-4
+lr <- 1e-3
 optimizer <- "adamw"
 batch_size <- 64
 epochs <- 1000
@@ -72,7 +72,7 @@ model <- diffusion_model %>%
 fitted <- model %>%
   fit(
     dataset,
-    valid_data = valid_dataset,
+    valid_data = as_dataloader(valid_dataset, batch_size = batch_size, shuffle = TRUE), # validation data is shuffled for KID
     epochs = epochs,
     dataloader_options = list(batch_size = batch_size),
     verbose = TRUE,
