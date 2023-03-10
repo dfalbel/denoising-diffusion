@@ -22,7 +22,7 @@ block_depth <- 2
 lr <- 1e-3
 optimizer <- "adamw"
 batch_size <- 64
-epochs <- 1000
+epochs <- 50
 min_signal_rate <- 0.02
 max_signal_rate <- 0.95
 patience <- 200
@@ -78,11 +78,8 @@ fitted <- model %>%
     dataloader_options = list(batch_size = batch_size),
     verbose = TRUE,
     callbacks = list(
-      luz_callback_lr_scheduler(lr_step, step_size = patience/2, gamma = 0.1^(1/3)),
-      luz_callback_early_stopping(monitor = "train_loss", min_delta = 0.0005, patience = patience),
       callback_generate_samples(num_images = 20, diffusion_steps = 20),
-      luz_callback_tfevents(logdir = logdir, histograms = TRUE),
-      luz_callback_gradient_clip()
+      luz_callback_tfevents(logdir = logdir, histograms = TRUE)
     )
   )
 
