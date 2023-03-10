@@ -8,7 +8,8 @@ box::use(luz[...])
 box::use(./diffusion[diffusion_model])
 box::use(./dataset[make_dataset])
 box::use(torch[...])
-box::use(./callbacks[callback_generate_samples, image_loss, plot_tensors, metric_kid_wrapper])
+box::use(./callbacks[callback_generate_samples, image_loss, plot_tensors])
+box::use(./kid[metric_kid])
 box::use(zeallot[...])
 
 set.seed(1)
@@ -53,9 +54,9 @@ model <- diffusion_model %>%
     optimizer = optimizer,
     metrics = luz_metric_set(
       metrics = list(image_loss()),
-      valid_metrics = list(metric_kid_wrapper())
+      valid_metrics = list(metric_kid())
     )
-  )%>%
+  ) %>%
   set_hparams(
     image_size = image_size,
     block_depth = block_depth,
