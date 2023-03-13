@@ -1,8 +1,8 @@
+#| train:
+#|  description: Trains the denoising diffusion model
 #| requires:
 #|  - file: data
 #|    target-type: link
-#| output-scalars:
-#|   - '(\key): (\value)'
 
 box::use(luz[...])
 box::use(./diffusion[diffusion_model])
@@ -15,27 +15,34 @@ box::use(zeallot[...])
 set.seed(1)
 torch_manual_seed(1)
 
-logdir <- fs::path("logs", gsub("[:punct: -]", "", lubridate::now()))
-tfevents::set_default_logdir(logdir)
-
-block_depth <- 2
-lr <- 1e-3
+# opt hyper parameters
 optimizer <- "adamw"
-batch_size <- 64
-epochs <- 50
+lr <- 1e-3
+weight_decay <- 1e-4
+
+# architecture pars
+block_depth <- 2
+embedding_dim <- 32
+unet_widths <- c(32, 64, 96, 128)
 min_signal_rate <- 0.02
 max_signal_rate <- 0.95
-patience <- 200
-weight_decay <- 1e-4
-loss <- "l1"
-embedding_dim <- 32
-dataset_name <- "flowers"
 
+# training pars
+batch_size <- 64
+epochs <- 50
+loss <- "l1"
+
+# dataset pars
+#| description: The dataset used for the experiment
+#| choices: [flowers, pets, debug]
+dataset_name <- "flowers"
 image_size <- c(3, 64, 64)
 
 optimizer <- if (optimizer == "adam") {
+  opt_hparams <- list(lr = lr)
   optim_adam
 } else if (optimizer == "adamw") {
+  opt_hparams <- list(lr = lr, weight_decay = weight_decay)
   torchopt::optim_adamw
 } else {
   rlang::abort("Optimizer not currently supported.")
@@ -49,28 +56,28 @@ loss <- if (loss %in% c("l1", "mae")) {
 
 c(dataset, valid_dataset) %<-% make_dataset(dataset_name, image_size[-1])
 
-model <- diffusion_model %>%
+model <- diffusion_model |>
   setup(
     optimizer = optimizer,
     metrics = luz_metric_set(
       metrics = list(image_loss()),
       valid_metrics = list(metric_kid())
     )
-  ) %>%
+  ) |>
   set_hparams(
     image_size = image_size,
     block_depth = block_depth,
     signal_rate = c(min_signal_rate, max_signal_rate),
     loss = loss,
-    widths = c(32, 64, 96, 128),
+    widths = unet_widths,
     embedding_dim = embedding_dim
-  ) %>%
-  set_opt_hparams(lr = lr, weight_decay = weight_decay)
+  ) |>
+  set_opt_hparams(!!!opt_hparams)
 
-#finder <- luz::lr_finder(model, data = dataset)
-#plot(finder) + ggplot2::coord_cartesian(ylim = c(0, 2))
+finder <- luz::lr_finder(model, data = dataset)
+plot(finder) + ggplot2::coord_cartesian(ylim = c(0, 2))
 
-fitted <- model %>%
+fitted <- model |>
   fit(
     dataset,
     valid_data = as_dataloader(valid_dataset, batch_size = batch_size, shuffle = TRUE), # validation data is shuffled for KID
@@ -79,7 +86,7 @@ fitted <- model %>%
     verbose = TRUE,
     callbacks = list(
       callback_generate_samples(num_images = 20, diffusion_steps = 20),
-      luz_callback_tfevents(logdir = logdir, histograms = TRUE)
+      luz_callback_tfevents(histograms = TRUE)
     )
   )
 

@@ -1,0 +1,5 @@
+train.R:
+  description: "Train denoising diffusion model"
+
+lr-finder.R:
+  description: "Produces a plot with the optimal learning rate"

@@ -5,12 +5,6 @@ box::use(zeallot[...])
 
 dir <- "./data" #caching directory
 
-tf_resize <- function(x, size) {
-  x <- aperm(as.array(x), c(2, 3, 1))
-  x <- tensorflow::tf$image$resize(x, as.integer(size), antialias = TRUE)
-  torch_tensor(aperm(as.array(x, c(3,1,2))))
-}
-
 diffusion_dataset <- dataset(
   "DiffusionDataset",
   initialize = function(dataset, image_size, ...) {
@@ -58,13 +52,21 @@ debug_dataset <- dataset(
 make_dataset <- function(type = c("pets", "flowers", "debug"), image_size) {
   type <- rlang::arg_match(type)
   if (type == "pets") {
-    diffusion_dataset(
+    train_dataset <- diffusion_dataset(
       torchdatasets::oxford_pet_dataset,
       target_type = "species",
       image_size,
       split = "train",
       download = TRUE
     )
+    valid_dataset <- diffusion_dataset(
+      torchdatasets::oxford_pet_dataset,
+      target_type = "species",
+      image_size,
+      split = "valid",
+      download = TRUE
+    )
+    list(train_dataset, valid_dataset)
   } else if (type == "flowers") {
     dataset <- diffusion_dataset(
       torchdatasets::oxford_flowers102_dataset,
@@ -80,13 +82,21 @@ make_dataset <- function(type = c("pets", "flowers", "debug"), image_size) {
       dataset_repeat(dataset_subset(dataset, valid_indexes))
     )
   } else if (type == "debug") {
-    debug_dataset(diffusion_dataset(
+    train_dataset <- debug_dataset(diffusion_dataset(
       torchdatasets::oxford_pet_dataset,
       target_type = "species",
       image_size,
       split = "train",
       download = TRUE
     ))
+    valid_dataset <- debug_dataset(diffusion_dataset(
+      torchdatasets::oxford_pet_dataset,
+      target_type = "species",
+      image_size,
+      split = "valid",
+      download = TRUE
+    ))
+    list(train_dataset, valid_dataset)
   } else {
     cli::cli_abort("Unsupported dataset type {.val {type}}")
   }
