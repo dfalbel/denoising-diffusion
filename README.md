@@ -1,7 +1,5 @@
-Denoising Diffusion Implicit Models
+Denoising Diffusion Models
 ================
-
-# Denoising Diffusion Models
 
 This repository contains a torch/luz implementation of the Denoising
 Diffusion Implicit Models. Code in this repository is heavily influenced
@@ -42,7 +40,7 @@ $$q(x_t | x_0) = \mathcal{N}(\sqrt{\alpha_t}x_0, \sqrt{1-\alpha_t}I)$$
 And thus, $x_t$ can be expressed as a linear combination of $x_0$ and a
 gaussian noise variable $\epsilon = \mathcal{N}(0, I)$:
 
-$$x_t = \sqrt{\alpha_t}x_0 + \sqrt{1-\alpha_t}*\epsilon$$
+$$x_t = \sqrt{\alpha_t}x_0 + \sqrt{1-\alpha_t}\epsilon$$
 
 ## Sinusoidal embedding
 
