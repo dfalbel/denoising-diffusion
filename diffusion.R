@@ -2,7 +2,7 @@ box::use(./unet[unet, swish])
 box::use(torch[...])
 box::use(zeallot[...])
 
-diffusion_schedule <- nn_module(
+cosine_schedule <- nn_module(
   initialize = function(min_signal_rate = 0.02, max_signal_rate = 0.98) {
     self$start_angle <- nn_buffer(torch_acos(max_signal_rate))
     self$end_angle <- nn_buffer(torch_acos(min_signal_rate))
@@ -14,6 +14,35 @@ diffusion_schedule <- nn_module(
       signal = torch_cos(angles),
       noise = torch_sin(angles)
     )
+  }
+)
+
+linear_schedule <- nn_module(
+  initialize = function(min_signal_rate = 0.02, max_signal_rate = 0.98) {
+    self$min_signal_rate <- min_signal_rate
+    self$max_signal_rate <- max_signal_rate
+  },
+  forward = function(diffusion_times) {
+    signal_variance <- 1 - diffusion_times
+    signal_variance <- torch_max(list(signal_variance, self$min_signal_rate))
+    signal_variance <- torch_min(list(signal_variance, self$max_signal_rate))
+    list(
+      signal = torch_sqrt(signal_variance),
+      noise = torch_sqrt(1 - signal_variance)
+    )
+  }
+)
+
+diffusion_schedule <- nn_module(
+  initialize = function(type = "cosine", min_signal_rate = 0.02, max_signal_rate = 0.98) {
+    self$schedule <- if (type == "linear") {
+      linear_schedule(min_signal_rate, max_signal_rate)
+    } else {
+      cosine_schedule(min_signal_rate, max_signal_rate)
+    }
+  },
+  forward = function(diffusion_times) {
+    self$schedule(diffusion_times)
   }
 )
 
@@ -108,9 +137,9 @@ diffusion <- nn_module(
 
 diffusion_model <- nn_module(
   initialize = function(image_size, embedding_dim = 32, widths = c(32, 64, 96, 128), block_depth = 2,
-                        signal_rate = c(0.02, 0.95), loss = NULL) {
+                        diffusion_schedule = cosine_schedule(0.02, 0.95), loss = NULL) {
     self$diffusion <- diffusion(image_size, embedding_dim, widths, block_depth)
-    self$diffusion_schedule <- diffusion_schedule(signal_rate[1], signal_rate[2])
+    self$diffusion_schedule <- diffusion_schedule
     self$image_size <- image_size
     self$normalize <- normalize(image_size[1])
 

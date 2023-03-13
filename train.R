@@ -5,7 +5,7 @@
 #|    target-type: link
 
 box::use(luz[...])
-box::use(./diffusion[diffusion_model])
+box::use(./diffusion[diffusion_model, diffusion_schedule])
 box::use(./dataset[make_dataset])
 box::use(torch[...])
 box::use(./callbacks[callback_generate_samples, image_loss, plot_tensors])
@@ -24,6 +24,7 @@ weight_decay <- 1e-4
 block_depth <- 2
 embedding_dim <- 32
 unet_widths <- c(32, 64, 96, 128)
+schedule_type <- "cosine"
 min_signal_rate <- 0.02
 max_signal_rate <- 0.95
 
@@ -70,7 +71,8 @@ model <- diffusion_model |>
     signal_rate = c(min_signal_rate, max_signal_rate),
     loss = loss,
     widths = unet_widths,
-    embedding_dim = embedding_dim
+    embedding_dim = embedding_dim,
+    diffusion_schedule = diffusion_schedule(schedule_type, min_signal_rate, max_signal_rate)
   ) |>
   set_opt_hparams(!!!opt_hparams)
 

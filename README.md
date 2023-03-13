@@ -23,24 +23,43 @@ it’s just the image part.
 
 Originaly the forward diffusion process has been defined as a Markov
 process that successively (for eg. for $T$ time steps) adds Gaussian
-noise to the data distribution until the resulting distribution is a
-standard Gaussian distribution. Ie, labelling the data distribution as
-$q(x_{0})$ we have the forward process defined as:
+noise (although (Bansal et al. 2022) seems to show that any lossy image
+transformation works) to the data distribution until the resulting
+distribution is a standard Gaussian distribution. If we label the data
+distribution as $q(x_{0})$ we have the forward process defined as:
 
 $$q(x_{t} | x_{t-1}) = \mathcal{N}(x_{t-1} \sqrt{1 - \beta_t}, I\beta_t )$$
 where $\beta_t$ is the diffusion rate and $\beta_t \in (0,1)$. $\beta_t$
-could be learned as in Sohl-Dickstein et al. (2015), but it’s usually, a
+could be learned as in Sohl-Dickstein et al. (2015), but usually a
 pre-defined schedule is used.
 
 One important property of this process is that you can easily sample
-from $q(x_t | x_0)$. Using a reparametrization trick derived in Nichol
-and Dhariwal (2021) (see also (Weng 2021)) one can express:
+from $q(x_t | x_0)$. Using a reparametrization trick derived in (Ho,
+Jain, and Abbeel 2020) (see also (Weng 2021)) one can express:
 
 $$q(x_t | x_0) = \mathcal{N}(\sqrt{\alpha_t}x_0, \sqrt{1-\alpha_t}I)$$
 And thus, $x_t$ can be expressed as a linear combination of $x_0$ and a
-gaussian noise variable $\epsilon = \mathcal{N}(0, I)$:
+Gaussian noise variable $\epsilon = \mathcal{N}(0, I)$:
 
 $$x_t = \sqrt{\alpha_t}x_0 + \sqrt{1-\alpha_t}\epsilon$$
+
+### Setting the diffusion rate
+
+The diffusion rate $\alpha_t$ schedule is in general a decreasing
+sequence of values, such that when $t$ is large $x_t$ is almost pure
+noise. In our implementation the schedule is defined in terms of a
+continuous time variable so that we can change the number of diffusion
+steps as much as needed during sampling. $\alpha_t$ is interpreted as
+the proportion of variance that comes from the original image ($x_0$) in
+$x_t$.
+
+In Song, Meng, and Ermon (2020) and Ho, Jain, and Abbeel (2020),
+$(\alpha_t)^2$ varies linearly from 1 to 0 with the number of diffusion
+steps. Nichol and Dhariwal (2021) proposes that a cosine schedule can
+lead to better model performance.
+
+Below we can visualize the forward diffusion process with both the
+linear and cosine scheduling for 10 diffusion steps.
 
 ## Sinusoidal embedding
 
@@ -79,10 +98,26 @@ plot_tensors(x)
 
 <div id="refs" class="references csl-bib-body hanging-indent">
 
+<div id="ref-bansal2022" class="csl-entry">
+
+Bansal, Arpit, Eitan Borgnia, Hong-Min Chu, Jie S. Li, Hamid Kazemi,
+Furong Huang, Micah Goldblum, Jonas Geiping, and Tom Goldstein. 2022.
+“Cold Diffusion: Inverting Arbitrary Image Transforms Without Noise.”
+<https://doi.org/10.48550/ARXIV.2208.09392>.
+
+</div>
+
 <div id="ref-kerasDDIM" class="csl-entry">
 
 Béres, András. 2022. “Denoising Diffusion Implicit Models.”
 <https://keras.io/examples/generative/ddim/>.
+
+</div>
+
+<div id="ref-ho2020" class="csl-entry">
+
+Ho, Jonathan, Ajay Jain, and Pieter Abbeel. 2020. “Denoising Diffusion
+Probabilistic Models.” <https://doi.org/10.48550/ARXIV.2006.11239>.
 
 </div>
 

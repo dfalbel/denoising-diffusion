@@ -13,18 +13,28 @@ While there's a strong theory foundation for denoising diffusion models, in prac
 
 ## Forward diffusion
 
-Originaly the forward diffusion process has been defined as a Markov process that successively (for eg. for $T$ time steps) adds Gaussian noise to the data distribution
-until the resulting distribution is a standard Gaussian distribution. Ie, labelling the data distribution as $q(x_{0})$ we have the forward process defined as:
+Originaly the forward diffusion process has been defined as a Markov process that successively (for eg. for $T$ time steps) adds Gaussian noise (although [@bansal2022] seems to show that any lossy image transformation works) to the data distribution until the resulting distribution is a standard Gaussian distribution. If we label the data distribution as $q(x_{0})$ we have the forward process defined as:
 
-$$q(x_{t} | x_{t-1}) = \mathcal{N}(x_{t-1} \sqrt{1 - \beta_t}, I\beta_t )$$
-where $\beta_t$ is the diffusion rate and $\beta_t \in (0,1)$. $\beta_t$ could be learned as in @sohl-dickstein2015, but it's usually, a pre-defined schedule is used. 
+$$q(x_{t} | x_{t-1}) = \mathcal{N}(x_{t-1} \sqrt{1 - \beta_t}, I\beta_t )$$ where $\beta_t$ is the diffusion rate and $\beta_t \in (0,1)$. $\beta_t$ could be learned as in @sohl-dickstein2015, but usually a pre-defined schedule is used.
 
-One important property of this process is that you can easily sample from $q(x_t | x_0)$. Using a reparametrization trick derived in @nichol2021 (see also [@weng2021diffusion]) one can express:
+One important property of this process is that you can easily sample from $q(x_t | x_0)$. Using a reparametrization trick derived in [@ho2020] (see also [@weng2021diffusion]) one can express:
 
-$$q(x_t | x_0) = \mathcal{N}(\sqrt{\alpha_t}x_0, \sqrt{1-\alpha_t}I)$$
-And thus, $x_t$ can be expressed as a linear combination of $x_0$ and a gaussian noise variable $\epsilon = \mathcal{N}(0, I)$:
+$$q(x_t | x_0) = \mathcal{N}(\sqrt{\alpha_t}x_0, \sqrt{1-\alpha_t}I)$$ And thus, $x_t$ can be expressed as a linear combination of $x_0$ and a Gaussian noise variable $\epsilon = \mathcal{N}(0, I)$:
 
 $$x_t = \sqrt{\alpha_t}x_0 + \sqrt{1-\alpha_t}\epsilon$$
+
+### Setting the diffusion rate
+
+The diffusion rate $\alpha_t$ schedule is in general a decreasing sequence of values, such that when $t$ is large $x_t$ is almost pure noise. In our implementation the schedule is defined in terms of a continuous time variable so that we can change the number of diffusion steps as much as needed during sampling. $\alpha_t$ is interpreted as the proportion of variance that comes from the original image ($x_0$) in $x_t$.
+
+In @song2020 and @ho2020, $(\alpha_t)^2$ varies linearly from 1 to 0 with the number of diffusion steps.
+@nichol2021 proposes that a cosine schedule can lead to better model performance.
+
+Below we can visualize the forward diffusion process with both the linear and cosine scheduling for 10 diffusion steps.
+
+```{r}
+
+```
 
 ## Sinusoidal embedding
 
