@@ -98,9 +98,10 @@ Thus, if we can estimate $x_0$ from $x_t$ , since we know
 $\bar{\alpha_t}$ for every $t$ , we can then sample from $x_{t-1}$ by
 reusing the above equation. With this simplified view, our goal then is
 to train a neural networks that takes $x_t$ as input and returns an
-estimate for $\hat{x}_0$. Since we know how to sample from $q(x_t|x_0)$
-we can generate as much training sample as needed. We can train this
-neural network to minimize $||x_0 - \hat{x}_0||^2$ or any other norm.
+estimate $\hat{x}_0$ for $x_0$. Since we know how to sample from
+$q(x_t|x_0)$ we can generate as much training samples as needed. We can
+train this neural network to minimize $||x_0 - \hat{x}_0||^2$ or any
+other norm.
 
 There’s another way to get an estimate $\hat{x}_0$ though. If we get an
 estimate $\hat{\epsilon}$, we can replace it in the above equation and
