@@ -23,10 +23,9 @@ it’s just the image part.
 
 Originaly the forward diffusion process has been defined as a Markov
 process that successively (for eg. for $T$ time steps) adds Gaussian
-noise (although (Bansal et al. 2022) seems to show that any lossy image
-transformation works) to the data distribution until the resulting
-distribution is a standard Gaussian distribution. If we label the data
-distribution as $q(x_{0})$ we have the forward process defined as:
+noise[^1] to the data distribution until the resulting distribution is a
+standard Gaussian distribution. If we label the data distribution as
+$q(x_{0})$ we have the forward process defined as:
 
 $$q(x_{t} | x_{t-1}) = \mathcal{N}(x_{t-1} \sqrt{1 - \beta_t}, I\beta_t )$$
 where $\beta_t$ is the diffusion rate and $\beta_t \in (0,1)$. $\beta_t$
@@ -41,7 +40,7 @@ $$q(x_t | x_0) = \mathcal{N}(\sqrt{\bar{\alpha_t}}x_0, \sqrt{1-\bar{\alpha_t}}I)
 And thus, $x_t$ can be expressed as a linear combination of $x_0$ and a
 Gaussian noise variable $\epsilon = \mathcal{N}(0, I)$:
 
-$$x_t = \sqrt{\bar{\bar{\alpha_t}}}x_0 + \sqrt{1-\bar{\alpha_t}}\epsilon$$
+$$x_t = \sqrt{\bar{\alpha_t}}x_0 + \sqrt{1-\bar{\alpha_t}}\epsilon$$
 
 ### Setting the diffusion rate
 
@@ -183,3 +182,6 @@ July. <https://lilianweng.github.io/posts/2021-07-11-diffusion-models/>.
 </div>
 
 </div>
+
+[^1]: (Bansal et al. 2022) seems to show that any lossy image
+    transformation works
