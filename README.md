@@ -76,6 +76,48 @@ interfere in model performance according to <span class="citation"
 data-cites="nichol2021">Nichol and Dhariwal (2021)</span> .</figcaption>
 </figure>
 
+## Reverse diffusion
+
+The forward diffusion process thus is a fixed procedure to generate
+samples of $q(x_t|x_0)$, we are interested though in generating samples
+from $q(x_{t-1} | x_t)$ - known as reverse diffusion. Successively
+sampling this way would allow us to sample from $q(x_0 | x_T)$, ie,
+sample from the data distribution using only Gaussian noise.
+
+As $q(x_{t-1} | x_t)$ is an unknown distribution, we will train a neural
+network $p_{\theta}(x_{t-1} | x_t, \bar{\alpha_t})$ to approximate it.
+We will skip the math details here, but a good step by step on the math
+can be found in (Weng 2021).
+
+The intuition though is that, we have $x_t$ and we know that it can be
+expressed as:
+
+$$x_t = \sqrt{\bar{\alpha_t}}x_0 + \sqrt{1-\bar{\alpha_t}}\epsilon$$
+
+Thus, if we can estimate $x_0$ from $x_t$ , since we know
+$\bar{\alpha_t}$ for every $t$ , we can then sample from $x_{t-1}$ by
+reusing the above equation. With this simplified view, our goal then is
+to train a neural networks that takes $x_t$ as input and returns an
+estimate for $\hat{x}_0$. Since we know how to sample from $q(x_t|x_0)$
+we can generate as much training sample as needed. We can train this
+neural network to minimize $||x_0 - \hat{x}_0||^2$ or any other norm.
+
+There’s another way to get an estimate $\hat{x}_0$ though. If we get an
+estimate $\hat{\epsilon}$, we can replace it in the above equation and
+get an estimate for $x_0$. Empirically, this has been found by (Ho,
+Jain, and Abbeel 2020) to lead into better samples and training
+stability.
+
+<figure>
+<img src="README_files/figure-commonmark/reverse-1.png" width="704"
+height="128"
+alt="Forward diffusion (top) and reverse diffusion (bottom) using 10 difusion steps. The resulting noise from the forward diffusion process was used as input noise for the reverse diffusion process." />
+<figcaption aria-hidden="true">Forward diffusion (top) and reverse
+diffusion (bottom) using 10 difusion steps. The resulting noise from the
+forward diffusion process was used as input noise for the reverse
+diffusion process.</figcaption>
+</figure>
+
 ## Sinusoidal embedding
 
 A sinusoidal embedding is used to encode the diffusion times into the

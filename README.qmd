@@ -13,7 +13,9 @@ While there's a strong theory foundation for denoising diffusion models, in prac
 
 ## Forward diffusion
 
-Originaly the forward diffusion process has been defined as a Markov process that successively (for eg. for $T$ time steps) adds Gaussian noise^[[@bansal2022] seems to show that any lossy image transformation works] to the data distribution until the resulting distribution is a standard Gaussian distribution. If we label the data distribution as $q(x_{0})$ we have the forward process defined as:
+Originaly the forward diffusion process has been defined as a Markov process that successively (for eg. for $T$ time steps) adds Gaussian noise[^1] to the data distribution until the resulting distribution is a standard Gaussian distribution. If we label the data distribution as $q(x_{0})$ we have the forward process defined as:
+
+[^1]: [@bansal2022] seems to show that any lossy image transformation works
 
 $$q(x_{t} | x_{t-1}) = \mathcal{N}(x_{t-1} \sqrt{1 - \beta_t}, I\beta_t )$$ where $\beta_t$ is the diffusion rate and $\beta_t \in (0,1)$. $\beta_t$ could be learned as in @sohl-dickstein2015, but usually a pre-defined schedule is used.
 
@@ -62,6 +64,60 @@ noisy_images <- fitted$model$normalize$denormalize(noisy_images)
 
 plot_tensors(noisy_images, ncol = 11)
 ```
+
+## Reverse diffusion
+
+The forward diffusion process thus is a fixed procedure to generate samples of $q(x_t|x_0)$, we are interested though in generating samples from $q(x_{t-1} | x_t)$ - known as reverse diffusion. Successively sampling this way would allow us to sample from $q(x_0 | x_T)$, ie, sample from the data distribution using only Gaussian noise.
+
+As $q(x_{t-1} | x_t)$ is an unknown distribution, we will train a neural network $p_{\theta}(x_{t-1} | x_t, \bar{\alpha_t})$ to approximate it. We will skip the math details here, but a good step by step on the math can be found in [@weng2021diffusion].
+
+The intuition though is that, we have $x_t$ and we know that it can be expressed as:
+
+$$x_t = \sqrt{\bar{\alpha_t}}x_0 + \sqrt{1-\bar{\alpha_t}}\epsilon$$
+
+Thus, if we can estimate $x_0$ from $x_t$ , since we know $\bar{\alpha_t}$ for every $t$ , we can then sample from $x_{t-1}$ by reusing the above equation. With this simplified view, our goal then is to train a neural networks that takes $x_t$ as input and returns an estimate for $\hat{x}_0$. Since we know how to sample from $q(x_t|x_0)$ we can generate as much training sample as needed. We can train this neural network to minimize $||x_0 - \hat{x}_0||^2$ or any other norm.
+
+There's another way to get an estimate $\hat{x}_0$ though. If we get an estimate $\hat{\epsilon}$, we can replace it in the above equation and get an estimate for $x_0$. Empirically, this has been found by [@ho2020] to lead into better samples and training stability.
+
+```{r reverse, out.width="704px", out.height="128px", echo=FALSE}
+#| fig-cap: | 
+#|   Forward diffusion (top) and reverse diffusion (bottom) using 10 difusion steps.
+#|   The resulting noise from the forward diffusion process was used as input noise
+#|   for the reverse diffusion process.
+fitted <- luz::luz_load("luz_model.luz")
+fitted$model$eval()
+c(train_data, valid_data) %<-% make_dataset("flowers", c(64, 64))
+
+img <- train_data[1]$x$view(c(1,3,64,64))
+
+diffusion_steps <- 10
+
+diffusion_times <- torch_tensor(seq(0, 1, length.out = diffusion_steps+1))$view(c(-1, 1, 1, 1))
+img <- fitted$model$normalize(img)
+noise <- torch_randn(diffusion_steps+1, 3, 64, 64)
+
+schedule <- diffusion_schedule("cosine")
+rates <- schedule(diffusion_times)
+noisy_images <- rates$signal*img + rates$noise*noise
+
+reverse_images <- torch_empty_like(noisy_images)
+reverse_images[diffusion_steps+1,..] <- noisy_images[diffusion_steps+1, ..]
+for (i in diffusion_steps:1) {
+  r <- list(signal = rates$signal[i+1, .., drop=FALSE], noise =  rates$noise[i+1, .., drop=FALSE])
+  c(p_noise, p_img) %<-% fitted$model$denoise(reverse_images[i+1, .., drop=FALSE], r)
+  
+  r <- list(signal = rates$signal[i, .., drop=FALSE], noise =  rates$noise[i, .., drop=FALSE])
+  reverse_images[i,..] <- r$signal*p_img + r$noise*p_noise
+}
+
+reverse_images <- torch_flip(reverse_images, 1)
+
+noisy_images <- torch_cat(list(noisy_images, reverse_images), dim = 1)
+noisy_images <- fitted$model$normalize$denormalize(noisy_images)
+
+plot_tensors(noisy_images, ncol = diffusion_steps + 1)
+```
+
 
 ## Sinusoidal embedding
 
