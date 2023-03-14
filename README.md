@@ -37,29 +37,45 @@ One important property of this process is that you can easily sample
 from $q(x_t | x_0)$. Using a reparametrization trick derived in (Ho,
 Jain, and Abbeel 2020) (see also (Weng 2021)) one can express:
 
-$$q(x_t | x_0) = \mathcal{N}(\sqrt{\alpha_t}x_0, \sqrt{1-\alpha_t}I)$$
+$$q(x_t | x_0) = \mathcal{N}(\sqrt{\bar{\alpha_t}}x_0, \sqrt{1-\bar{\alpha_t}}I)$$
 And thus, $x_t$ can be expressed as a linear combination of $x_0$ and a
 Gaussian noise variable $\epsilon = \mathcal{N}(0, I)$:
 
-$$x_t = \sqrt{\alpha_t}x_0 + \sqrt{1-\alpha_t}\epsilon$$
+$$x_t = \sqrt{\bar{\bar{\alpha_t}}}x_0 + \sqrt{1-\bar{\alpha_t}}\epsilon$$
 
 ### Setting the diffusion rate
 
-The diffusion rate $\alpha_t$ schedule is in general a decreasing
-sequence of values, such that when $t$ is large $x_t$ is almost pure
+The diffusion rate $\bar{\alpha_t}$ schedule is in general a decreasing
+sequence of values, such that when $t$ is large, $x_t$ is almost pure
 noise. In our implementation the schedule is defined in terms of a
 continuous time variable so that we can change the number of diffusion
-steps as much as needed during sampling. $\alpha_t$ is interpreted as
-the proportion of variance that comes from the original image ($x_0$) in
-$x_t$.
+steps as much as needed during sampling. $\bar{\alpha_t}$ is interpreted
+as the proportion of variance that comes from the original image ($x_0$)
+in $x_t$.
 
-In Song, Meng, and Ermon (2020) and Ho, Jain, and Abbeel (2020),
-$(\alpha_t)^2$ varies linearly from 1 to 0 with the number of diffusion
-steps. Nichol and Dhariwal (2021) proposes that a cosine schedule can
-lead to better model performance.
+In Song, Meng, and Ermon (2020) and Ho, Jain, and Abbeel (2020), a so
+called linear schedule is used. However the linearity is happening on
+$\beta_t$ - before the reparametrization. Thus, $\bar{\alpha_t}$ under
+the linear schedule doesn’t vary linearly. Nichol and Dhariwal (2021)
+proposes that a cosine schedule can lead to better model performance,
+the cosine schedule is applied directly in $\bar{\alpha_t}$.
 
 Below we can visualize the forward diffusion process with both the
 linear and cosine scheduling for 10 diffusion steps.
+
+<figure>
+<img src="README_files/figure-commonmark/schedules-1.png" width="704"
+height="128"
+alt="Samples from q(x_t|x_0) for linearly spaced values of t with linear schedule (top) and the cosine schedule (bottom). We can see that with the linear schedule, images become almost pure noise after the first half - this seems to interfere in model performance according to Nichol and Dhariwal (2021) ." />
+<figcaption aria-hidden="true">Samples from <span
+class="math inline"><em>q</em>(<em>x</em><sub><em>t</em></sub>|<em>x</em><sub>0</sub>)</span>
+for linearly spaced values of <span
+class="math inline"><em>t</em></span> with linear schedule (top) and the
+cosine schedule (bottom). We can see that with the linear schedule,
+images become almost pure noise after the first half - this seems to
+interfere in model performance according to <span class="citation"
+data-cites="nichol2021">Nichol and Dhariwal (2021)</span> .</figcaption>
+</figure>
 
 ## Sinusoidal embedding
 

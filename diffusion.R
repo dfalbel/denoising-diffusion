@@ -19,16 +19,20 @@ cosine_schedule <- nn_module(
 
 linear_schedule <- nn_module(
   initialize = function(min_signal_rate = 0.02, max_signal_rate = 0.98) {
-    self$min_signal_rate <- min_signal_rate
-    self$max_signal_rate <- max_signal_rate
+    self$beta_start <- 0.0001
+    self$beta_end <- 0.02
+    self$scale <- 1000
+    self$betas <- torch_linspace(self$beta_start, self$beta_end, steps = self$scale)
+    self$alphas <- 1 - self$betas
+    self$alpha_bars <- torch_cumprod(self = self$alphas, dim = 1)
+    self$alpha_bars <- torch_clip(self$alpha_bars, min_signal_rate, max_signal_rate)
   },
   forward = function(diffusion_times) {
-    signal_variance <- 1 - diffusion_times
-    signal_variance <- torch_max(list(signal_variance, self$min_signal_rate))
-    signal_variance <- torch_min(list(signal_variance, self$max_signal_rate))
+    indexes <- 1L + as.integer(diffusion_times*(self$scale - 1))
+    alphas <- self$alpha_bars[indexes]
     list(
-      signal = torch_sqrt(signal_variance),
-      noise = torch_sqrt(1 - signal_variance)
+      signal = torch_sqrt(alphas)$view_as(diffusion_times),
+      noise = torch_sqrt(1 - alphas)$view_as(diffusion_times)
     )
   }
 )
@@ -37,8 +41,10 @@ diffusion_schedule <- nn_module(
   initialize = function(type = "cosine", min_signal_rate = 0.02, max_signal_rate = 0.98) {
     self$schedule <- if (type == "linear") {
       linear_schedule(min_signal_rate, max_signal_rate)
-    } else {
+    } else if (type == "cosine") {
       cosine_schedule(min_signal_rate, max_signal_rate)
+    } else {
+      stop("unsupported")
     }
   },
   forward = function(diffusion_times) {
