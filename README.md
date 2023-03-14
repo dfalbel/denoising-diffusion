@@ -76,6 +76,10 @@ interfere in model performance according to <span class="citation"
 data-cites="nichol2021">Nichol and Dhariwal (2021)</span> .</figcaption>
 </figure>
 
+Also in practice, we never let $\bar{\alpha_t}} = 0$ or
+$\bar{\alpha_t}} = 1$ and instead limit it into a minimum and maximum
+signal rate to avoid training stability issues.
+
 ## Reverse diffusion
 
 The forward diffusion process thus is a fixed procedure to generate
@@ -119,16 +123,124 @@ forward diffusion process was used as input noise for the reverse
 diffusion process.</figcaption>
 </figure>
 
-## Sinusoidal embedding
+## Neural network architecture
 
-A sinusoidal embedding is used to encode the diffusion times into the
-model. The visualization below shows how diffusion times are mapped to
-the embedding - assuming the dimension size of 32. Each row is a
-embedding vector given the diffusion time. Sinusoidal embedding have
-nice properties, like preserving the relative distances (Kazemnejad
-2019).
+Although denoising diffusion models can work with whatever kind of data
+distribution $q(x_0)$ that you might want to sample from, in this
+example we will apply it to image datasets. Thus $q(x_0)$ is the data
+distribution of images in the selected dataset.
 
-![](README_files/figure-commonmark/sinusoidal-1.png)
+Since we are dealing with images, we will use neural network
+architectures that are adapted for that domain. The neural network we
+are building takes a noisy image sampled from $q(x_t|x_0)$ and the
+variance $\bar{\alpha_t}$ and returns an estimate $\hat{\epsilon}$. Both
+$x_t$ and $\epsilon$ have the same dimensions which is 3D tensors with
+$(C, H, W)$ where $C=3$ is the number of channels and $H$ and $W$ are
+respectively the height and width of the images. Typically $H=W$ since
+we are going to use squared images.
+
+The core part of the neural network is a U-Net (Ronneberger, Fischer,
+and Brox 2015), which is a common architecture in domains where both the
+input and the output are image-like tensors. The U-Net takes as input a
+concatenation of $x_t$ with the sinusoidal embedding (Vaswani et al.
+2017) of $1 - \bar{\alpha_t}$. Embedding the noise variance into the
+model is very important as it allows the network to be sensible to
+different amount of noise, and thus being able to make good estimates
+for $x_{t-1}$ no matter the actual $t$. The output of the U-Net is then
+passed to a simple convolution layer that just processes it into a lower
+depth version.
+
+### Sinusoidal embedding
+
+A sinusoidal embedding (Vaswani et al. 2017) is used to encode the
+diffusion times (or the noise variance) into the model. The
+visualization below shows how diffusion times are mapped to the
+embedding - assuming the dimension size of 32. Each row is a embedding
+vector given the diffusion time. Sinusoidal embedding have nice
+properties, like preserving the relative distances (Kazemnejad 2019).
+
+<img src="README_files/figure-commonmark/sinusoidal-1.png" width="300"
+height="200" />
+
+You can find the code dor the sinusoidal embedding in `diffusion.R`.
+
+### U-Net
+
+A U-Net is a convolutional neural network that successively downsamples
+the image resolution while increasing its depth. After a few
+downsampling blocks, it starts upsampling the representation and
+decreasing the channels depth. The main idea in U-Net, is that much like
+Residual Networks, the upsampling blocks take as input both the
+representation from the previous upsampling block and the representation
+from a previous downsampling block.
+
+<figure>
+<img
+src="https://blogs.rstudio.com/ai/posts/2019-08-23-unet/images/unet.png"
+style="width:50.0%" alt="Unet model" />
+<figcaption aria-hidden="true">Unet model</figcaption>
+</figure>
+
+Unlike the original U-Net implementation, we use ResNet Blocks (He et
+al. 2015) in the downsampling and upsampling blocks of the U-Net. Each
+down or upsampling blocks contain *block_depth* of those ResNet blocks.
+We also use the [Swish
+activation](https://en.wikipedia.org/wiki/Swish_function) function.
+
+(Song, Meng, and Ermon 2020) and (Ho, Jain, and Abbeel 2020) also use an
+attention layer at lower resolutions, but we didn’t for simplicity. The
+code for the U-Net can be found in `unet.R`.
+
+## NN module
+
+Given the definitions of `unet` and the `sinusoidal_embedding` we can
+implement the diffusion model with:
+
+``` r
+diffusion <- nn_module(
+  initialize = function(image_size, embedding_dim = 32, widths = c(32, 64, 96, 128), block_depth = 2) {
+    self$unet <- unet(2*embedding_dim, embedding_dim, widths = widths, block_depth)
+    self$embedding <- sinusoidal_embedding(embedding_dim = embedding_dim)
+
+    self$conv <- nn_conv2d(image_size[1], embedding_dim, kernel_size = 1)
+    self$upsample <- nn_upsample(size = image_size[2:3])
+
+    self$conv_out <- nn_conv2d(embedding_dim, image_size[1], kernel_size = 1)
+    # we initialize at zeros so the initial output of the network is also just zeroes
+    purrr::walk(self$conv_out$parameters, nn_init_zeros_)
+  },
+  forward = function(noisy_images, noise_variances) {
+    embedded_variance <- noise_variances |>
+      self$embedding() |>
+      self$upsample()
+
+    embedded_image <- noisy_images |>
+      self$conv()
+
+    unet_input <- torch_cat(list(embedded_image, embedded_variance), dim = 2)
+    unet_output <- unet_input %>%
+      self$unet() %>%
+      self$conv_out()
+  }
+)
+```
+
+With the default hyperparameters here’s the diffusion model summary:
+
+``` r
+diffusion(image_size = c(3, 64, 64))
+```
+
+    An `nn_module` containing 3,562,211 parameters.
+
+    ── Modules ─────────────────────────────────────────────────────────────────────
+    • unet: <nn_module> #3,561,984 parameters
+    • embedding: <nn_module> #0 parameters
+    • conv: <nn_conv2d> #128 parameters
+    • upsample: <nn_upsample> #0 parameters
+    • conv_out: <nn_conv2d> #99 parameters
+
+## Training
 
 ## Sampling images
 
@@ -172,6 +284,14 @@ Béres, András. 2022. “Denoising Diffusion Implicit Models.”
 
 </div>
 
+<div id="ref-he2015" class="csl-entry">
+
+He, Kaiming, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. 2015. “Deep
+Residual Learning for Image Recognition.”
+<https://doi.org/10.48550/ARXIV.1512.03385>.
+
+</div>
+
 <div id="ref-ho2020" class="csl-entry">
 
 Ho, Jonathan, Ajay Jain, and Pieter Abbeel. 2020. “Denoising Diffusion
@@ -202,6 +322,14 @@ Probabilistic Models.” <https://doi.org/10.48550/ARXIV.2102.09672>.
 
 </div>
 
+<div id="ref-ronneberger2015" class="csl-entry">
+
+Ronneberger, Olaf, Philipp Fischer, and Thomas Brox. 2015. “U-Net:
+Convolutional Networks for Biomedical Image Segmentation.”
+<https://doi.org/10.48550/ARXIV.1505.04597>.
+
+</div>
+
 <div id="ref-sohl-dickstein2015" class="csl-entry">
 
 Sohl-Dickstein, Jascha, Eric A. Weiss, Niru Maheswaranathan, and Surya
@@ -214,6 +342,15 @@ Thermodynamics.” <https://doi.org/10.48550/ARXIV.1503.03585>.
 
 Song, Jiaming, Chenlin Meng, and Stefano Ermon. 2020. “Denoising
 Diffusion Implicit Models.” <https://doi.org/10.48550/ARXIV.2010.02502>.
+
+</div>
+
+<div id="ref-vaswani2017" class="csl-entry">
+
+Vaswani, Ashish, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion
+Jones, Aidan N. Gomez, Lukasz Kaiser, and Illia Polosukhin. 2017.
+“Attention Is All You Need.”
+<https://doi.org/10.48550/ARXIV.1706.03762>.
 
 </div>
 
