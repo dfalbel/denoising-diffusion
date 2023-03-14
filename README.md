@@ -76,8 +76,8 @@ interfere in model performance according to <span class="citation"
 data-cites="nichol2021">Nichol and Dhariwal (2021)</span> .</figcaption>
 </figure>
 
-Also in practice, we never let $\bar{\alpha_t}} = 0$ or
-$\bar{\alpha_t}} = 1$ and instead limit it into a minimum and maximum
+Also in practice, we never let $\bar{\alpha_t} = 0$ or
+$\bar{\alpha_t} = 1$ and instead limit it into a minimum and maximum
 signal rate to avoid training stability issues.
 
 ## Reverse diffusion
@@ -191,14 +191,15 @@ activation](https://en.wikipedia.org/wiki/Swish_function) function.
 attention layer at lower resolutions, but we didn’t for simplicity. The
 code for the U-Net can be found in `unet.R`.
 
-## NN module
+### NN module
 
 Given the definitions of `unet` and the `sinusoidal_embedding` we can
 implement the diffusion model with:
 
 ``` r
 diffusion <- nn_module(
-  initialize = function(image_size, embedding_dim = 32, widths = c(32, 64, 96, 128), block_depth = 2) {
+  initialize = function(image_size, embedding_dim = 32, widths = c(32, 64, 96, 128), 
+                        block_depth = 2) {
     self$unet <- unet(2*embedding_dim, embedding_dim, widths = widths, block_depth)
     self$embedding <- sinusoidal_embedding(embedding_dim = embedding_dim)
 
