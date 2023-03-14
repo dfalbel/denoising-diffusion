@@ -195,13 +195,78 @@ diffusion <- nn_module(
 )
 ```
 
-With the default hyperparameters here's the diffusion model summary:
+With the default hyper-parameters here's the diffusion model summary:
 
 ```{r}
 diffusion(image_size = c(3, 64, 64))
 ```
 
 ## Training
+
+The model is trained to learn $q(x_{t-1} | x_t)$.
+At each iteration we sample random $t$ values and $x_0$ images, we then apply the forward diffusion
+transformation, so that we obtain $x_t$. We then get the estimate of $\hat{\epsilon}$ using our neural network $f_{\theta}(x_t, \bar{\alpha_t})$, compute the loss $MAE(\epsilon, \hat{\epsilon})$ and backprop it to update the neural network parameters $\theta$. 
+
+![The training algorithm pseudocode from @ho2020](./README_files/training.png){width=400px}
+
+In luz, since this is not a conventional supervised model, we implement the training logic in the `step()` method of the diffusion module, which looks like:
+
+```{r, eval = FALSE}
+diffusion_model <- nn_module(  
+  ... # other method omitted for chose focus
+  step = function() {
+    # images are standard normalized
+    ctx$input <- images <- ctx$model$normalize(ctx$input)
+    
+    # sample random diffusion times and use the scheduler to obtain the amount
+    # of variance that should be applied for each t
+    diffusion_times <- torch_rand(images$shape[1], 1, 1, 1, device = images$device)
+    rates <- self$diffusion_schedule(diffusion_times)
+
+    # forward diffusion - generate x_t
+    noises <- torch_randn_like(images)
+    images <- rates$signal * images + rates$noise * noises
+
+    # 'denoises' the noisy images.
+    # creates predictions for the image and noise part
+    ctx$pred <- ctx$model(images, rates)
+    loss <- self$loss(noises, ctx$pred$pred_noises)
+
+    # this `step()` method is also applied during validation. 
+    # we only want to backprop during training though
+    if (ctx$training) {
+      ctx$opt$zero_grad()
+      loss$backward()
+      ctx$opt$step()
+    }
+
+    # saves the loss for correctly reporting metrics in luz
+    ctx$loss[[ctx$opt_name]] <- loss$detach()
+  }
+  ...
+)
+```
+
+### Configuration
+
+We use [GuildAI](https://guild.ai) for training configuration. The [guildai](https://github.com/guildai/guildai-r) automatically parses the `train.R` script and allow us to change any scalar value defined in the top level of the file.
+
+For instance, you can run the training script with the default values using:
+
+```{r, eval=FALSE}
+guildai::guild_run("train.R")
+```
+
+You can supply different hyperparameter values by using the `flags` argument, eg:
+
+```{r, eval=FALSE}
+guildai::guild_run("train.R", flags = list(batch_size = 128))
+```
+
+Besides allowing configuring the training hyper-parameters, GuildAI also tracks all experiment files and results.
+Since we are passing `luz_callback_tfevents()` to `fit` when training the diffusion model, all metrics will also be logged and can be visualized in the [Guild View](https://my.guild.ai/t/guild-view/167) dashboard and accessed using `guildai::runs_info()`.
+
+### Experiments
 
 ## Sampling images
 
