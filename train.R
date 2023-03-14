@@ -68,7 +68,6 @@ model <- diffusion_model |>
   set_hparams(
     image_size = image_size,
     block_depth = block_depth,
-    signal_rate = c(min_signal_rate, max_signal_rate),
     loss = loss,
     widths = unet_widths,
     embedding_dim = embedding_dim,
@@ -87,7 +86,7 @@ fitted <- model |>
     dataloader_options = list(batch_size = batch_size),
     verbose = TRUE,
     callbacks = list(
-      callback_generate_samples(num_images = 20, diffusion_steps = 20),
+      callback_generate_samples(num_images = 36, diffusion_steps = 20),
       luz_callback_tfevents(histograms = TRUE)
     )
   )
