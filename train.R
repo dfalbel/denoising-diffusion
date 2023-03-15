@@ -32,6 +32,8 @@ max_signal_rate <- 0.95
 batch_size <- 64
 epochs <- 50
 loss <- "l1"
+#| choices: [noise, image]
+loss_on <- "noise"
 
 # dataset pars
 #| description: The dataset used for the experiment
@@ -71,7 +73,8 @@ model <- diffusion_model |>
     loss = loss,
     widths = unet_widths,
     embedding_dim = embedding_dim,
-    diffusion_schedule = diffusion_schedule(schedule_type, min_signal_rate, max_signal_rate)
+    diffusion_schedule = diffusion_schedule(schedule_type, min_signal_rate, max_signal_rate),
+    loss_on = loss_on
   ) |>
   set_opt_hparams(!!!opt_hparams)
 

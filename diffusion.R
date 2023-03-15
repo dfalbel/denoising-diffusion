@@ -143,7 +143,7 @@ diffusion <- nn_module(
 
 diffusion_model <- nn_module(
   initialize = function(image_size, embedding_dim = 32, widths = c(32, 64, 96, 128), block_depth = 2,
-                        diffusion_schedule = cosine_schedule(0.02, 0.95), loss = NULL) {
+                        diffusion_schedule = cosine_schedule(0.02, 0.95), loss = NULL, loss_on = NULL) {
     self$diffusion <- diffusion(image_size, embedding_dim, widths, block_depth)
     self$diffusion_schedule <- diffusion_schedule
     self$image_size <- image_size
@@ -151,6 +151,7 @@ diffusion_model <- nn_module(
 
     if (is.null(loss)) loss <- nnf_l1_loss
     self$loss <- loss
+    self$loss_on <- if (is.null(loss_on)) "noise" else loss_on
   },
   denoise = function(images, rates) {
     pred_noises <- self$diffusion(images, rates$noise^2)
@@ -174,7 +175,12 @@ diffusion_model <- nn_module(
     images <- rates$signal * images + rates$noise * noises
 
     ctx$pred <- ctx$model(images, rates)
-    loss <- self$loss(noises, ctx$pred$pred_noises)
+
+    loss <- if (self$loss_on == "noise") {
+      self$loss(noises, ctx$pred$pred_noises)
+    } else if (self$loss_on == "image") {
+      self$loss(images, ctx$pred$pred_images)
+    }
 
     if (ctx$training) {
       ctx$opt$zero_grad()
