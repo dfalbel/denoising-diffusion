@@ -25,10 +25,10 @@ linear_schedule <- nn_module(
     self$betas <- torch_linspace(self$beta_start, self$beta_end, steps = self$scale)
     self$alphas <- 1 - self$betas
     self$alpha_bars <- torch_cumprod(self = self$alphas, dim = 1)
-    self$alpha_bars <- torch_clip(self$alpha_bars, min_signal_rate, max_signal_rate)
+    self$alpha_bars <- nn_buffer(torch_clip(self$alpha_bars, min_signal_rate, max_signal_rate))
   },
   forward = function(diffusion_times) {
-    indexes <- 1L + as.integer(diffusion_times*(self$scale - 1))
+    indexes <- 1L + as.integer((diffusion_times*(self$scale - 1))$cpu())
     alphas <- self$alpha_bars[indexes]
     list(
       signal = torch_sqrt(alphas)$view_as(diffusion_times),
