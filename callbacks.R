@@ -38,6 +38,14 @@ image_loss <- luz_metric(
   }
 )
 
+noise_loss <- luz_metric(
+  "noise_loss",
+  abbrev = "noise_loss",
+  inherit = luz_metric_mae,
+  update = function(preds, target) {
+    super$update(preds$pred_noises, ctx$buffers$noises)
+  }
+)
 
 plot_tensors <- function(x, denormalize = identity, ncol = 6) {
   if (inherits(x, "torch_tensor"))

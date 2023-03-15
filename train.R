@@ -8,7 +8,7 @@ box::use(luz[...])
 box::use(./diffusion[diffusion_model, diffusion_schedule])
 box::use(./dataset[make_dataset])
 box::use(torch[...])
-box::use(./callbacks[callback_generate_samples, image_loss, plot_tensors])
+box::use(./callbacks[callback_generate_samples, image_loss, noise_loss, plot_tensors])
 box::use(./kid[metric_kid])
 box::use(zeallot[...])
 
@@ -40,6 +40,7 @@ loss_on <- "noise"
 #| choices: [flowers, pets, debug]
 dataset_name <- "flowers"
 image_size <- c(3, 64, 64)
+num_workers <- 0
 
 optimizer <- if (optimizer == "adam") {
   opt_hparams <- list(lr = lr)
@@ -63,7 +64,7 @@ model <- diffusion_model |>
   setup(
     optimizer = optimizer,
     metrics = luz_metric_set(
-      metrics = list(image_loss()),
+      metrics = list(image_loss(), noise_loss()),
       valid_metrics = list(metric_kid())
     )
   ) |>
@@ -84,9 +85,14 @@ plot(finder) + ggplot2::coord_cartesian(ylim = c(0, 2))
 fitted <- model |>
   fit(
     dataset,
-    valid_data = as_dataloader(valid_dataset, batch_size = batch_size, shuffle = TRUE), # validation data is shuffled for KID
+    valid_data = as_dataloader(
+      valid_dataset,
+      batch_size = 2*batch_size,
+      shuffle = TRUE,
+      num_workers = num_workers
+    ), # validation data is shuffled for KID
     epochs = epochs,
-    dataloader_options = list(batch_size = batch_size),
+    dataloader_options = list(batch_size = batch_size, num_workers = num_workers),
     verbose = TRUE,
     callbacks = list(
       callback_generate_samples(num_images = 36, diffusion_steps = 20),

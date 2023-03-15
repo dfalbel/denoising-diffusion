@@ -66,7 +66,7 @@ make_dataset <- function(type = c("pets", "flowers", "debug"), image_size) {
       split = "valid",
       download = TRUE
     )
-    list(train_dataset, valid_dataset)
+    list(dataset_repeat(train_dataset, 3), dataset_repeat(valid_dataset, 3))
   } else if (type == "flowers") {
     dataset <- diffusion_dataset(
       torchdatasets::oxford_flowers102_dataset,

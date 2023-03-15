@@ -154,8 +154,13 @@ diffusion_model <- nn_module(
     self$loss_on <- if (is.null(loss_on)) "noise" else loss_on
   },
   denoise = function(images, rates) {
-    pred_noises <- self$diffusion(images, rates$noise^2)
-    pred_images <- (images - rates$noise * pred_noises) / rates$signal
+    if (self$loss_on == "noise") {
+      pred_noises <- self$diffusion(images, rates$noise^2)
+      pred_images <- (images - rates$noise * pred_noises) / rates$signal
+    } else {
+      pred_images <- self$diffusion(images, rates$signal^2)
+      pred_noises <- (images - rates$signal * pred_images) / rates$noise
+    }
 
     list(
       pred_noises = pred_noises,
@@ -171,7 +176,7 @@ diffusion_model <- nn_module(
     diffusion_times <- torch_rand(images$shape[1], 1, 1, 1, device = images$device)
     rates <- self$diffusion_schedule(diffusion_times)
 
-    noises <- torch_randn_like(images)
+    ctx$buffers$noises <- noises <- torch_randn_like(images)
     images <- rates$signal * images + rates$noise * noises
 
     ctx$pred <- ctx$model(images, rates)

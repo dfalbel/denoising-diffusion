@@ -268,6 +268,32 @@ Since we are passing `luz_callback_tfevents()` to `fit` when training the diffus
 
 ### Experiments
 
+We ran experiments for two different datasets:
+
+- Oxford pets
+- Oxford flowers
+
+For each dataset we experimented with 3 configuration options, leaving all other
+hyper-parameters fixed with the default values. Those were:
+
+- `loss` function : 'mae' and 'mse'
+- `loss_on`: 'noise' and 'image' - wether the model is predicting the images or noise values.
+- `schedule_type`: 'linear' or 'cosine'
+
+Taking advantage of GuildAI integration, experiments can be ran with:
+
+```r
+guildai::guild_run("train.R", flags = list(
+  dataset_name = c("pets", "flowers"),
+  loss = c("mae", "mse"),
+  loss_on = c("noise", "image"),
+  schedule_type = c("linear", "cosine"),
+  num_workers = 8
+))
+```
+
+
+
 ## Sampling images
 
 Images can be sampled from the model using the `generate` method. Remember to always set the model into `eval()` mode before sampling, so the batch normal layers are correctly applied.
