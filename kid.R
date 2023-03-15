@@ -9,6 +9,7 @@ inception_encoder <- torch::nn_module(
     self$kid_image_size <- kid_image_size
   },
   forward = function(x) {
+    local_no_grad()
     x |>
       torchvision::transform_resize(self$kid_image_size) |>
       torchvision::transform_normalize(
