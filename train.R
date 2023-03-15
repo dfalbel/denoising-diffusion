@@ -5,7 +5,7 @@
 #|    target-type: link
 
 box::use(luz[...])
-box::use(./diffusion[diffusion_model, diffusion_schedule])
+box::use(./diffusion[diffusion_model, diffusion_schedule_config])
 box::use(./dataset[make_dataset])
 box::use(torch[...])
 box::use(./callbacks[callback_generate_samples, image_loss, noise_loss, plot_tensors])
@@ -74,7 +74,7 @@ model <- diffusion_model |>
     loss = loss,
     widths = unet_widths,
     embedding_dim = embedding_dim,
-    diffusion_schedule = diffusion_schedule(schedule_type, min_signal_rate, max_signal_rate),
+    schedule = diffusion_schedule_config(schedule_type, min_signal_rate, max_signal_rate),
     loss_on = loss_on
   ) |>
   set_opt_hparams(!!!opt_hparams)

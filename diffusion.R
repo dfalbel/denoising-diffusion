@@ -37,6 +37,14 @@ linear_schedule <- nn_module(
   }
 )
 
+diffusion_schedule_config <- function(type = "cosine", min_signal_rate = 0.02, max_signal_rate = 0.98) {
+  list(
+    type = type,
+    min_signal_rate = min_signal_rate,
+    max_signal_rate = max_signal_rate
+  )
+}
+
 diffusion_schedule <- nn_module(
   initialize = function(type = "cosine", min_signal_rate = 0.02, max_signal_rate = 0.98) {
     self$schedule <- if (type == "linear") {
@@ -143,9 +151,10 @@ diffusion <- nn_module(
 
 diffusion_model <- nn_module(
   initialize = function(image_size, embedding_dim = 32, widths = c(32, 64, 96, 128), block_depth = 2,
-                        diffusion_schedule = cosine_schedule(0.02, 0.95), loss = NULL, loss_on = NULL) {
+                        schedule = diffusion_schedule_config("cosine", 0.02, 0.95),
+                        loss = NULL, loss_on = NULL) {
     self$diffusion <- diffusion(image_size, embedding_dim, widths, block_depth)
-    self$diffusion_schedule <- diffusion_schedule
+    self$diffusion_schedule <- do.call(diffusion_schedule, schedule)
     self$image_size <- image_size
     self$normalize <- normalize(image_size[1])
 
