@@ -292,6 +292,24 @@ guildai::guild_run("train.R", flags = list(
 ))
 ```
 
+The results for the flowers dataset are:
+
+```{r}
+runs <- guildai::runs_info() |>
+  dplyr::filter(started >= as.POSIXct("2023-03-25"), started <= as.POSIXct("2023-03-29"))
+runs |> 
+  dplyr::filter(flags$dataset_name == "flowers") |>
+  tidyr::unnest(flags, scalars) |> 
+  dplyr::select(
+    loss_type = loss, 
+    loss_on = loss_on, 
+    schedule_type = schedule_type,
+    valid
+  ) |>
+  tidyr::unnest(valid, names_repair = "minimal") |>
+  dplyr::select(-loss) |>
+  knitr::kable()
+```
 
 
 ## Sampling images

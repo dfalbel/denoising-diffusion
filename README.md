@@ -329,6 +329,61 @@ View](https://my.guild.ai/t/guild-view/167) dashboard and accessed using
 
 ### Experiments
 
+We ran experiments for two different datasets:
+
+- Oxford pets
+- Oxford flowers
+
+For each dataset we experimented with 3 configuration options, leaving
+all other hyper-parameters fixed with the default values. Those were:
+
+- `loss` function : ‘mae’ and ‘mse’
+- `loss_on`: ‘noise’ and ‘image’ - wether the model is predicting the
+  images or noise values.
+- `schedule_type`: ‘linear’ or ‘cosine’
+
+Taking advantage of GuildAI integration, experiments can be ran with:
+
+``` r
+guildai::guild_run("train.R", flags = list(
+  dataset_name = c("pets", "flowers"),
+  loss = c("mae", "mse"),
+  loss_on = c("noise", "image"),
+  schedule_type = c("linear", "cosine"),
+  num_workers = 8
+))
+```
+
+The results for the flowers dataset are:
+
+``` r
+runs <- guildai::runs_info() |>
+  dplyr::filter(started >= as.POSIXct("2023-03-25"), started <= as.POSIXct("2023-03-29"))
+runs |> 
+  dplyr::filter(flags$dataset_name == "flowers") |>
+  tidyr::unnest(flags, scalars) |> 
+  dplyr::select(
+    loss_type = loss, 
+    loss_on = loss_on, 
+    schedule_type = schedule_type,
+    valid
+  ) |>
+  tidyr::unnest(valid, names_repair = "minimal") |>
+  dplyr::select(-loss) |>
+  knitr::kable()
+```
+
+    Warning: unnest() has a new interface. See ?unnest for details.
+    Try `df %>% unnest(c(flags, scalars))`, with `mutate()` if needed
+
+| loss_type | loss_on | schedule_type | image_loss |       kid | noise_loss |
+|:----------|:--------|:--------------|-----------:|----------:|-----------:|
+| mse       | noise   | linear        |  0.3111771 | 0.1883375 |  0.1412659 |
+| mae       | image   | cosine        |  0.7147801 | 0.3659356 |  0.4845871 |
+| mae       | image   | linear        |  0.8110971 | 0.3657027 |  0.3784671 |
+| mae       | noise   | cosine        |  0.2614991 | 0.1590363 |  0.1653944 |
+| mae       | noise   | linear        |  0.3051421 | 0.1969572 |  0.1405347 |
+
 ## Sampling images
 
 Images can be sampled from the model using the `generate` method.
