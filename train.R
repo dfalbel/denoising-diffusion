@@ -64,8 +64,7 @@ model <- diffusion_model |>
   setup(
     optimizer = optimizer,
     metrics = luz_metric_set(
-      metrics = list(image_loss(), noise_loss()),
-      valid_metrics = list(metric_kid())
+      metrics = list(image_loss(), noise_loss())
     )
   ) |>
   set_hparams(
@@ -85,19 +84,30 @@ plot(finder) + ggplot2::coord_cartesian(ylim = c(0, 2))
 fitted <- model |>
   fit(
     dataset,
-    valid_data = as_dataloader(
-      valid_dataset,
-      batch_size = 2*batch_size,
-      shuffle = TRUE,
-      num_workers = num_workers
-    ), # validation data is shuffled for KID
     epochs = epochs,
     dataloader_options = list(batch_size = batch_size, num_workers = num_workers),
     verbose = TRUE,
     callbacks = list(
       callback_generate_samples(num_images = 36, diffusion_steps = 20),
-      luz_callback_tfevents(histograms = TRUE)
+      luz_callback_tfevents(histograms = FALSE)
     )
   )
+
+results <- fitted %>%
+  evaluate(
+    data = as_dataloader(
+      valid_dataset,
+      batch_size = 2*batch_size,
+      shuffle = TRUE,
+      num_workers = num_workers
+    ),
+    metrics = list(
+      image_loss(),
+      noise_loss(),
+      metric_kid()
+    )
+  )
+
+print(reults)
 
 luz_save(fitted, path = "luz_model.luz")
