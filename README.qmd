@@ -203,11 +203,9 @@ diffusion(image_size = c(3, 64, 64))
 
 ## Training
 
-The model is trained to learn $q(x_{t-1} | x_t)$.
-At each iteration we sample random $t$ values and $x_0$ images, we then apply the forward diffusion
-transformation, so that we obtain $x_t$. We then get the estimate of $\hat{\epsilon}$ using our neural network $f_{\theta}(x_t, \bar{\alpha_t})$, compute the loss $MAE(\epsilon, \hat{\epsilon})$ and backprop it to update the neural network parameters $\theta$. 
+The model is trained to learn $q(x_{t-1} | x_t)$. At each iteration we sample random $t$ values and $x_0$ images, we then apply the forward diffusion transformation, so that we obtain $x_t$. We then get the estimate of $\hat{\epsilon}$ using our neural network $f_{\theta}(x_t, \bar{\alpha_t})$, compute the loss $MAE(\epsilon, \hat{\epsilon})$ and backprop it to update the neural network parameters $\theta$.
 
-![The training algorithm pseudocode from @ho2020](./README_files/training.png){width=400px}
+![The training algorithm pseudocode from @ho2020](./README_files/training.png){width="400px"}
 
 In luz, since this is not a conventional supervised model, we implement the training logic in the `step()` method of the diffusion module, which looks like:
 
@@ -263,26 +261,24 @@ You can supply different hyperparameter values by using the `flags` argument, eg
 guildai::guild_run("train.R", flags = list(batch_size = 128))
 ```
 
-Besides allowing configuring the training hyper-parameters, GuildAI also tracks all experiment files and results.
-Since we are passing `luz_callback_tfevents()` to `fit` when training the diffusion model, all metrics will also be logged and can be visualized in the [Guild View](https://my.guild.ai/t/guild-view/167) dashboard and accessed using `guildai::runs_info()`.
+Besides allowing configuring the training hyper-parameters, GuildAI also tracks all experiment files and results. Since we are passing `luz_callback_tfevents()` to `fit` when training the diffusion model, all metrics will also be logged and can be visualized in the [Guild View](https://my.guild.ai/t/guild-view/167) dashboard and accessed using `guildai::runs_info()`.
 
 ### Experiments
 
 We ran experiments for two different datasets:
 
-- Oxford pets
-- Oxford flowers
+-   Oxford pets
+-   Oxford flowers
 
-For each dataset we experimented with 3 configuration options, leaving all other
-hyper-parameters fixed with the default values. Those were:
+For each dataset we experimented with 3 configuration options, leaving all other hyper-parameters fixed with the default values. Those were:
 
-- `loss` function : 'mae' and 'mse'
-- `loss_on`: 'noise' and 'image' - wether the model is predicting the images or noise values.
-- `schedule_type`: 'linear' or 'cosine'
+-   `loss` function : 'mae' and 'mse'
+-   `loss_on`: 'noise' and 'image' - wether the model is predicting the images or noise values.
+-   `schedule_type`: 'linear' or 'cosine'
 
-Taking advantage of GuildAI integration, experiments can be ran with:
+Taking advantage of GuildAI integration, experiments can be run with:
 
-```r
+``` r
 guildai::guild_run("train.R", flags = list(
   dataset_name = c("pets", "flowers"),
   loss = c("mae", "mse"),
@@ -292,25 +288,40 @@ guildai::guild_run("train.R", flags = list(
 ))
 ```
 
-The results for the flowers dataset are:
+The results for the flowers dataset are shown below:
 
 ```{r}
-runs <- guildai::runs_info() |>
-  dplyr::filter(started >= as.POSIXct("2023-03-25"), started <= as.POSIXct("2023-03-29"))
+runs <- guildai::runs_info(label = "flowers_exp1")
 runs |> 
-  dplyr::filter(flags$dataset_name == "flowers") |>
-  tidyr::unnest(flags, scalars) |> 
+  tidyr::unpack(c(flags, scalars)) |> 
   dplyr::select(
-    loss_type = loss, 
+    loss = loss, 
     loss_on = loss_on, 
     schedule_type = schedule_type,
-    valid
-  ) |>
-  tidyr::unnest(valid, names_repair = "minimal") |>
-  dplyr::select(-loss) |>
+    noise_loss,
+    image_loss,
+    kid
+  ) %>% 
   knitr::kable()
 ```
 
+We can see that given that the other hyper-parameters are fixed, it's better to train the neural network on the MAE of the noises using a cosine schedule. Below we compare images generated for each different run. The ordering is the same as the table above, so you can visualize the effect of different values of KID.
+
+```{r samples_per_experiment}
+images <- runs$dir |> 
+  lapply(function(x) {
+    model <- luz::luz_load(file.path(x, "luz_model.luz"))
+    with_no_grad({
+      model$model$eval()
+      model$model$generate(8)  
+    })
+  })
+
+images |>
+  lapply(function(x) torch::torch_unbind(x)) |>
+  unlist() |>
+  plot_tensors(ncol = 8, denormalize = identity)
+```
 
 ## Sampling images
 

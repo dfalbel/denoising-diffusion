@@ -342,7 +342,7 @@ all other hyper-parameters fixed with the default values. Those were:
   images or noise values.
 - `schedule_type`: ‘linear’ or ‘cosine’
 
-Taking advantage of GuildAI integration, experiments can be ran with:
+Taking advantage of GuildAI integration, experiments can be run with:
 
 ``` r
 guildai::guild_run("train.R", flags = list(
@@ -354,35 +354,57 @@ guildai::guild_run("train.R", flags = list(
 ))
 ```
 
-The results for the flowers dataset are:
+The results for the flowers dataset are shown below:
 
 ``` r
-runs <- guildai::runs_info() |>
-  dplyr::filter(started >= as.POSIXct("2023-03-25"), started <= as.POSIXct("2023-03-29"))
+runs <- guildai::runs_info(label = "flowers_exp1")
 runs |> 
-  dplyr::filter(flags$dataset_name == "flowers") |>
-  tidyr::unnest(flags, scalars) |> 
+  tidyr::unpack(c(flags, scalars)) |> 
   dplyr::select(
-    loss_type = loss, 
+    loss = loss, 
     loss_on = loss_on, 
     schedule_type = schedule_type,
-    valid
-  ) |>
-  tidyr::unnest(valid, names_repair = "minimal") |>
-  dplyr::select(-loss) |>
+    noise_loss,
+    image_loss,
+    kid
+  ) %>% 
   knitr::kable()
 ```
 
-    Warning: unnest() has a new interface. See ?unnest for details.
-    Try `df %>% unnest(c(flags, scalars))`, with `mutate()` if needed
+| loss | loss_on | schedule_type | noise_loss | image_loss |       kid |
+|:-----|:--------|:--------------|-----------:|-----------:|----------:|
+| mse  | image   | cosine        |  0.4835953 |  0.7167605 | 0.3655073 |
+| mse  | image   | linear        |  0.3766442 |  0.8138317 | 0.3649815 |
+| mse  | noise   | cosine        |  0.1653200 |  0.2689797 | 0.1118684 |
+| mse  | noise   | linear        |  0.1400425 |  0.3130383 | 0.1755732 |
+| mae  | image   | cosine        |  0.4836761 |  0.7168015 | 0.3657972 |
+| mae  | image   | linear        |  0.3765011 |  0.8135592 | 0.3649954 |
+| mae  | noise   | cosine        |  0.1645384 |  0.2612465 | 0.0667027 |
+| mae  | noise   | linear        |  0.1390513 |  0.3053726 | 0.1622408 |
 
-| loss_type | loss_on | schedule_type | image_loss |       kid | noise_loss |
-|:----------|:--------|:--------------|-----------:|----------:|-----------:|
-| mse       | noise   | linear        |  0.3111771 | 0.1883375 |  0.1412659 |
-| mae       | image   | cosine        |  0.7147801 | 0.3659356 |  0.4845871 |
-| mae       | image   | linear        |  0.8110971 | 0.3657027 |  0.3784671 |
-| mae       | noise   | cosine        |  0.2614991 | 0.1590363 |  0.1653944 |
-| mae       | noise   | linear        |  0.3051421 | 0.1969572 |  0.1405347 |
+We can see that given that the other hyper-parameters are fixed, it’s
+better to train the neural network on the MAE of the noises using a
+cosine schedule. Below we compare images generated for each different
+run. The ordering is the same as the table above, so you can visualize
+the effect of different values of KID.
+
+``` r
+images <- runs$dir |> 
+  lapply(function(x) {
+    model <- luz::luz_load(file.path(x, "luz_model.luz"))
+    with_no_grad({
+      model$model$eval()
+      model$model$generate(8)  
+    })
+  })
+
+images |>
+  lapply(function(x) torch::torch_unbind(x)) |>
+  unlist() |>
+  plot_tensors(ncol = 8, denormalize = identity)
+```
+
+![](README_files/figure-commonmark/samples_per_experiment-1.png)
 
 ## Sampling images
 
