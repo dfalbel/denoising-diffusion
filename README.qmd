@@ -288,6 +288,10 @@ guildai::guild_run("train.R", flags = list(
 ))
 ```
 
+We evaluated the KID [@binkowski2018] on the final model so as to compare the quality of generated samples.
+
+### Results
+
 The results for the flowers dataset are shown below:
 
 ```{r}
@@ -313,7 +317,7 @@ images <- runs$dir |>
     model <- luz::luz_load(file.path(x, "luz_model.luz"))
     with_no_grad({
       model$model$eval()
-      model$model$generate(8)  
+      model$model$generate(8, diffusion_steps=20)  
     })
   })
 

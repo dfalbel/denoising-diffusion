@@ -354,6 +354,11 @@ guildai::guild_run("train.R", flags = list(
 ))
 ```
 
+We evaluated the KID (Bińkowski et al. 2018) on the final model so as to
+compare the quality of generated samples.
+
+### Results
+
 The results for the flowers dataset are shown below:
 
 ``` r
@@ -394,7 +399,7 @@ images <- runs$dir |>
     model <- luz::luz_load(file.path(x, "luz_model.luz"))
     with_no_grad({
       model$model$eval()
-      model$model$generate(8)  
+      model$model$generate(8, diffusion_steps=20)  
     })
   })
 
@@ -445,6 +450,14 @@ Furong Huang, Micah Goldblum, Jonas Geiping, and Tom Goldstein. 2022.
 
 Béres, András. 2022. “Denoising Diffusion Implicit Models.”
 <https://keras.io/examples/generative/ddim/>.
+
+</div>
+
+<div id="ref-binkowski2018" class="csl-entry">
+
+Bińkowski, Mikołaj, Danica J. Sutherland, Michael Arbel, and Arthur
+Gretton. 2018. “Demystifying MMD GANs.”
+<https://doi.org/10.48550/ARXIV.1801.01401>.
 
 </div>
 
