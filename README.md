@@ -421,11 +421,11 @@ the batch normal layers are correctly applied.
 box::use(torch[...])
 box::use(./callbacks[plot_tensors])
 
-fitted <- luz::luz_load("luz_model.luz")
+fitted <- luz::luz_load(file.path(runs$dir[which.min(runs$scalars$kid)], "luz_model.luz"))
 
 with_no_grad({
   fitted$model$eval()
-  x <- fitted$model$generate(36, diffusion_steps = 5)$to(device = "mps")
+  x <- fitted$model$generate(36, diffusion_steps = 25)
 })
 
 plot_tensors(x)
