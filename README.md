@@ -394,22 +394,72 @@ run. The ordering is the same as the table above, so you can visualize
 the effect of different values of KID.
 
 ``` r
-images <- runs$dir |> 
-  lapply(function(x) {
-    model <- luz::luz_load(file.path(x, "luz_model.luz"))
-    with_no_grad({
-      model$model$eval()
-      model$model$generate(8, diffusion_steps=20)  
+# we implement it at as a function so we can reuse for the pets dataset.
+plot_samples_from_runs <- function(runs) {
+  images <- runs$dir |> 
+    lapply(function(x) {
+      model <- luz::luz_load(file.path(x, "luz_model.luz"))
+      with_no_grad({
+        model$model$eval()
+        model$model$generate(8, diffusion_steps=20)  
+      })
     })
-  })
-
-images |>
-  lapply(function(x) torch::torch_unbind(x)) |>
-  unlist() |>
-  plot_tensors(ncol = 8, denormalize = identity)
+  
+  images |>
+    lapply(function(x) torch::torch_unbind(x)) |>
+    unlist() |>
+    plot_tensors(ncol = 8, denormalize = identity)
+}
+plot_samples_from_runs(runs)
 ```
 
 ![](README_files/figure-commonmark/samples_per_experiment-1.png)
+
+Below we also show the results fro the Oxford pets dataset:
+
+``` r
+pet_runs <- guildai::runs_info(label = "pets_exp1")
+pet_runs |> 
+  tidyr::unpack(c(flags, scalars)) |> 
+  dplyr::select(
+    loss = loss, 
+    loss_on = loss_on, 
+    schedule_type = schedule_type,
+    noise_loss,
+    image_loss,
+    kid
+  ) %>% 
+  knitr::kable()
+```
+
+| loss | loss_on | schedule_type | noise_loss | image_loss |       kid |
+|:-----|:--------|:--------------|-----------:|-----------:|----------:|
+| mse  | image   | cosine        |  0.4883460 |  0.7172473 | 0.3024270 |
+| mse  | image   | linear        |  0.3797459 |  0.8162298 | 0.3028805 |
+| mse  | noise   | cosine        |  0.1624075 |  0.2608972 | 0.1798809 |
+| mse  | noise   | linear        |  0.1392281 |  0.3028255 | 0.1270332 |
+| mae  | image   | cosine        |  0.4881921 |  0.7170140 | 0.3026654 |
+| mae  | image   | linear        |  0.3799292 |  0.8164758 | 0.3028298 |
+| mae  | noise   | cosine        |  0.1620857 |  0.2544903 | 0.1370383 |
+| mae  | noise   | linear        |  0.1387370 |  0.2974243 | 0.1596186 |
+
+Again, the images below are ordered the same way as the above table,
+each row representing a different experiment configuration.
+
+``` r
+plot_samples_from_runs(pet_runs)
+```
+
+![](README_files/figure-commonmark/unnamed-chunk-9-1.png)
+
+Even though the results for the second dataset are not really
+impressive, using larger models is likely to improve the quality of the
+generated images.
+
+We confirm that most of the practical decisions from the literature,
+like reducing the noise loss instead of the image loss, using a cosine
+schedule instead of the linear schedule can be reproduced and shown to
+be better than the alternatives.
 
 ## Sampling images
 
