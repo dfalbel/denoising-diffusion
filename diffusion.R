@@ -186,9 +186,9 @@ diffusion_model <- nn_module(
     rates <- self$diffusion_schedule(diffusion_times)
 
     ctx$buffers$noises <- noises <- torch_randn_like(images)
-    images <- rates$signal * images + rates$noise * noises
+    noisy_images <- rates$signal * images + rates$noise * noises
 
-    ctx$pred <- ctx$model(images, rates)
+    ctx$pred <- ctx$model(noisy_images, rates)
 
     loss <- if (self$loss_on == "noise") {
       self$loss(noises, ctx$pred$pred_noises)
@@ -227,5 +227,8 @@ diffusion_model <- nn_module(
   generate = function(num_images, diffusion_steps = 20) {
     initial_noise <- torch_randn(c(num_images, self$image_size), device=self$device)
     self$reverse_diffusion(initial_noise, diffusion_steps = diffusion_steps)
+  },
+  predict = function(num_images, diffusion_steps = 20) {
+    self$generate(...)
   }
 )
