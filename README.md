@@ -362,7 +362,8 @@ compare the quality of generated samples.
 The results for the flowers dataset are shown below:
 
 ``` r
-runs <- guildai::runs_info(label = "flowers_exp1")
+runs <- guildai::runs_info(label = "full_exp1") %>% 
+  dplyr::filter(flags$dataset_name == "flowers")
 runs |> 
   tidyr::unpack(c(flags, scalars)) |> 
   dplyr::select(
@@ -378,14 +379,14 @@ runs |>
 
 | loss | loss_on | schedule_type | noise_loss | image_loss |       kid |
 |:-----|:--------|:--------------|-----------:|-----------:|----------:|
-| mse  | image   | cosine        |  0.4835953 |  0.7167605 | 0.3655073 |
-| mse  | image   | linear        |  0.3766442 |  0.8138317 | 0.3649815 |
-| mse  | noise   | cosine        |  0.1653200 |  0.2689797 | 0.1118684 |
-| mse  | noise   | linear        |  0.1400425 |  0.3130383 | 0.1755732 |
-| mae  | image   | cosine        |  0.4836761 |  0.7168015 | 0.3657972 |
-| mae  | image   | linear        |  0.3765011 |  0.8135592 | 0.3649954 |
-| mae  | noise   | cosine        |  0.1645384 |  0.2612465 | 0.0667027 |
-| mae  | noise   | linear        |  0.1390513 |  0.3053726 | 0.1622408 |
+| mse  | image   | cosine        |  0.1714205 |  0.2668262 | 0.1390257 |
+| mse  | image   | linear        |  0.1472155 |  0.3130986 | 0.2125010 |
+| mse  | noise   | cosine        |  0.1655174 |  0.2694866 | 0.1315258 |
+| mse  | noise   | linear        |  0.1399971 |  0.3131811 | 0.1652256 |
+| mae  | image   | cosine        |  0.1665038 |  0.2591124 | 0.1038467 |
+| mae  | image   | linear        |  0.1435601 |  0.3056073 | 0.1912024 |
+| mae  | noise   | cosine        |  0.1644953 |  0.2626610 | 0.0934186 |
+| mae  | noise   | linear        |  0.1388959 |  0.3046939 | 0.1673736 |
 
 We can see that given that the other hyper-parameters are fixed, it’s
 better to train the neural network on the MAE of the noises using a
@@ -418,7 +419,8 @@ plot_samples_from_runs(runs)
 Below we also show the results fro the Oxford pets dataset:
 
 ``` r
-pet_runs <- guildai::runs_info(label = "pets_exp1")
+pet_runs <- guildai::runs_info(label = "full_exp1") %>% 
+  dplyr::filter(flags$dataset_name == "pets")
 pet_runs |> 
   tidyr::unpack(c(flags, scalars)) |> 
   dplyr::select(
@@ -434,14 +436,14 @@ pet_runs |>
 
 | loss | loss_on | schedule_type | noise_loss | image_loss |       kid |
 |:-----|:--------|:--------------|-----------:|-----------:|----------:|
-| mse  | image   | cosine        |  0.4883460 |  0.7172473 | 0.3024270 |
-| mse  | image   | linear        |  0.3797459 |  0.8162298 | 0.3028805 |
-| mse  | noise   | cosine        |  0.1624075 |  0.2608972 | 0.1798809 |
-| mse  | noise   | linear        |  0.1392281 |  0.3028255 | 0.1270332 |
-| mae  | image   | cosine        |  0.4881921 |  0.7170140 | 0.3026654 |
-| mae  | image   | linear        |  0.3799292 |  0.8164758 | 0.3028298 |
-| mae  | noise   | cosine        |  0.1620857 |  0.2544903 | 0.1370383 |
-| mae  | noise   | linear        |  0.1387370 |  0.2974243 | 0.1596186 |
+| mse  | image   | cosine        |  0.1682112 |  0.2542121 | 0.1500503 |
+| mse  | image   | linear        |  0.1472592 |  0.3009916 | 0.1741628 |
+| mse  | noise   | cosine        |  0.1630672 |  0.2554463 | 0.1886360 |
+| mse  | noise   | linear        |  0.1390071 |  0.2988549 | 0.1187079 |
+| mae  | image   | cosine        |  0.1649045 |  0.2497923 | 0.1487082 |
+| mae  | image   | linear        |  0.1444500 |  0.2968645 | 0.2122481 |
+| mae  | noise   | cosine        |  0.1644861 |  0.2545764 | 0.1971107 |
+| mae  | noise   | linear        |  0.1390262 |  0.2952372 | 0.1810841 |
 
 Again, the images below are ordered the same way as the above table,
 each row representing a different experiment configuration.

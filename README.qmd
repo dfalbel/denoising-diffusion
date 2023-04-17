@@ -295,7 +295,8 @@ We evaluated the KID [@binkowski2018] on the final model so as to compare the qu
 The results for the flowers dataset are shown below:
 
 ```{r}
-runs <- guildai::runs_info(label = "flowers_exp1")
+runs <- guildai::runs_info(label = "full_exp1") %>% 
+  dplyr::filter(flags$dataset_name == "flowers")
 runs |> 
   tidyr::unpack(c(flags, scalars)) |> 
   dplyr::select(
@@ -334,7 +335,8 @@ plot_samples_from_runs(runs)
 Below we also show the results fro the Oxford pets dataset:
 
 ```{r}
-pet_runs <- guildai::runs_info(label = "pets_exp1")
+pet_runs <- guildai::runs_info(label = "full_exp1") %>% 
+  dplyr::filter(flags$dataset_name == "pets")
 pet_runs |> 
   tidyr::unpack(c(flags, scalars)) |> 
   dplyr::select(
